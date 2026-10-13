@@ -6,6 +6,8 @@
 //! - `parity`  menu-catalog coverage → docs/parity-checklist.md
 //! - `version` print the version, or `version set X.Y.Z`
 //! - `icon`    regenerate the app icon PNGs/ICO from assets/app-icon/figcraft.svg (needs resvg)
+//! - `ios`     build the iPad bundle (packaging/ios) and run it on the Simulator or a device
+//!   (`ios (--sim | --device) [--release] [--dry-run]`; macOS + Xcode)
 //! - `wasm`    check the core crates and web app for wasm32, and build the plugin SDK and examples
 //! - `plugins` format-check, lint, test and build the plugin SDK and example plugins (`plugins/`, a
 //!   workspace of its own) for wasm32: `<target>/plugins/dist/<example>/` holds each manifest and
@@ -14,6 +16,7 @@
 //!   with a synthetic design system used by 2,000 instances
 
 mod icon;
+mod ios;
 mod layers;
 
 use std::process::{Command, ExitCode};
@@ -41,15 +44,27 @@ fn main() -> ExitCode {
         "parity" => parity(),
         "version" => version(args.get(1).map(String::as_str), args.get(2).map(String::as_str)),
         "icon" => icon::generate(&root()),
+        "ios" => ios_task(&args[1..]),
         "wasm" => wasm(),
         "plugins" => plugins(),
         "bench" => bench(args.get(1).map_or("1000,10000,50000", String::as_str)),
         _ => {
-            eprintln!("tasks: ci, layers, assets, parity, version [set X.Y.Z], icon, wasm, plugins, bench [SIZES]");
+            eprintln!("tasks: ci, layers, assets, parity, version [set X.Y.Z], icon, ios, wasm, plugins, bench [SIZES]");
             task == "help"
         }
     };
     if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+}
+
+fn ios_task(args: &[String]) -> bool {
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    match ios::run(&root(), &args) {
+        Ok(()) => true,
+        Err(error) => {
+            eprintln!("xtask ios: {error}");
+            false
+        }
+    }
 }
 
 fn ci() -> bool {
