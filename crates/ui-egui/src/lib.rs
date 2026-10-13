@@ -39,6 +39,7 @@ pub mod live_text;
 pub mod measure_overlay;
 pub mod menus;
 pub mod online;
+pub mod picks;
 pub mod plugins_ui;
 pub mod present;
 pub mod proto_canvas;
@@ -119,6 +120,8 @@ mod panel_width_tests;
 #[cfg(test)]
 mod perf_tests;
 #[cfg(test)]
+mod picks_tests;
+#[cfg(test)]
 mod plugin_panel_tests;
 #[cfg(test)]
 mod plugins_browse_tests;
@@ -157,6 +160,7 @@ use figcraft_engine::Session;
 use serde_json::{Value, json};
 
 pub use control::{ControlReply, ControlRequest};
+pub use picks::{PickKind, PickRequest};
 
 /// Platform services the app crate provides (file dialogs, clipboard, URLs).
 pub trait Services {
@@ -168,6 +172,17 @@ pub trait Services {
     }
     /// A folder to write several files into.
     fn pick_folder(&mut self, _title: &str) -> Option<PathBuf> {
+        None
+    }
+    /// Start a picker that answers on a later frame, for platforms whose picker cannot block the UI
+    /// thread (iPadOS). Return false to have the app use the blocking `pick_*` instead. After true,
+    /// [`Services::poll_pick`] is asked every frame until it has the answer.
+    fn begin_pick(&mut self, _request: &PickRequest) -> bool {
+        false
+    }
+    /// The answer to the pick [`Services::begin_pick`] started: `None` while the user is choosing,
+    /// `Some(None)` once cancelled, `Some(Some(path))` for a choice.
+    fn poll_pick(&mut self) -> Option<Option<PathBuf>> {
         None
     }
     fn clipboard_set_text(&mut self, _s: &str) {}
@@ -495,6 +510,8 @@ pub struct FigApp {
     window_requests: Vec<figcraft_engine::UiRequest>,
     /// Commands waiting for a server ([`FigApp::run_background`]) and what to do with their results.
     waiting: Vec<(String, Done)>,
+    /// What to do with the answer of the picker [`Services::begin_pick`] started.
+    pending_pick: Option<picks::PickDone>,
 }
 
 /// What to do with the result of a command run in the background.
@@ -522,6 +539,7 @@ impl FigApp {
             windows: windows::Windows::default(),
             window_requests: Vec::new(),
             waiting: Vec::new(),
+            pending_pick: None,
         }
     }
 
@@ -782,12 +800,12 @@ impl FigApp {
 
     pub fn save_as_dialog(&mut self) {
         let name = self.session.doc().map(|d| d.name.clone()).unwrap_or_else(|_| "Untitled".into());
-        if let Some(p) = self.services.pick_save(i18n::tr("Save as"), &format!("{name}.figcraft"), &["figcraft"]) {
+        self.pick(PickRequest::save(i18n::tr("Save as"), &format!("{name}.figcraft"), &["figcraft"]), |app, p| {
             let ps = p.to_string_lossy().to_string();
-            if self.run("file.saveAs", json!({"path": ps})).is_some() {
-                self.toast(i18n::trf("Saved {name}", &[("name", &p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default())]));
+            if app.run("file.saveAs", json!({"path": ps})).is_some() {
+                app.toast(i18n::trf("Saved {name}", &[("name", &p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default())]));
             }
-        }
+        });
     }
 
     pub fn save(&mut self) {
@@ -803,14 +821,13 @@ impl FigApp {
     }
 
     pub fn open_dialog(&mut self) {
-        if let Some(p) =
-            self.services.pick_open(i18n::tr("Open"), &["figcraft", "fig", "json", "svg", "png", "jpg", "jpeg", "webp", "gif", "tif", "tiff"])
-        {
+        let exts = ["figcraft", "fig", "json", "svg", "png", "jpg", "jpeg", "webp", "gif", "tif", "tiff"];
+        self.pick(PickRequest::open(i18n::tr("Open"), &exts), |app, p| {
             let ps = p.to_string_lossy().to_string();
-            if self.run("file.open", json!({"path": ps})).is_some() {
-                self.ui.home = false;
+            if app.run("file.open", json!({"path": ps})).is_some() {
+                app.ui.home = false;
             }
-        }
+        });
     }
 
     pub fn import_dialog(&mut self, place: bool) {
@@ -819,10 +836,10 @@ impl FigApp {
         } else {
             &["svg", "png", "jpg", "jpeg", "webp", "gif", "tif", "tiff", "figcraft", "fig"]
         };
-        if let Some(p) = self.services.pick_open(if place { i18n::tr("Place image") } else { i18n::tr("Import") }, exts) {
+        self.pick(PickRequest::open(if place { i18n::tr("Place image") } else { i18n::tr("Import") }, exts), |app, p| {
             let ps = p.to_string_lossy().to_string();
-            self.run("file.import", json!({"path": ps}));
-        }
+            app.run("file.import", json!({"path": ps}));
+        });
     }
 
     /// Reduced motion: the preference or the system's setting.
@@ -859,6 +876,7 @@ impl FigApp {
 
     /// Per-frame logic that doesn't draw (control requests, theme, language).
     pub fn logic(&mut self, ctx: &egui::Context) {
+        self.poll_pick();
         if self.language.as_ref() != Some(&self.session.prefs.language) {
             i18n::set(&self.session.prefs.language, self.services.system_language().as_deref());
             self.language = Some(self.session.prefs.language.clone());

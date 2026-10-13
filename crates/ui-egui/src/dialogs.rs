@@ -7,11 +7,11 @@ use figcraft_doc::{ExportFormat, ExportSetting, ExportSize, NodeId};
 use figcraft_engine::cmd::file::{export_jobs, exportable_layers};
 use serde_json::json;
 
-use crate::FigApp;
 use crate::export_panel::{export_layers, save_one, suggested_name};
 use crate::i18n::{self, tr, tr_noop, trf, trn};
 use crate::icons::{self, Icon};
 use crate::theme::{ACCENT, Tokens, regular, semibold};
+use crate::{FigApp, PickRequest};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -463,15 +463,16 @@ fn color_profile_dialog(app: &mut FigApp, ctx: &Context) {
 
 /// Save the whole file as `.fig`; the toast says how much was left out.
 fn save_fig(app: &mut FigApp, name: &str) {
-    let Some(p) = app.services.pick_save(tr("Export"), &format!("{name}.fig"), &["fig"]) else { return };
-    let file = p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
-    if let Some(r) = app.run("file.export", json!({"format": "fig", "path": p.to_string_lossy()})) {
-        let left_out = r["warnings"].as_array().map_or(0, Vec::len);
-        app.toast(match left_out {
-            0 => trf("Exported {name}", &[("name", &file)]),
-            n => trn("Exported {name}; {n} kinds of content were left out", n, &[("name", &file)]),
-        });
-    }
+    app.pick(PickRequest::save(tr("Export"), &format!("{name}.fig"), &["fig"]), |app, p| {
+        let file = p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+        if let Some(r) = app.run("file.export", json!({"format": "fig", "path": p.to_string_lossy()})) {
+            let left_out = r["warnings"].as_array().map_or(0, Vec::len);
+            app.toast(match left_out {
+                0 => trf("Exported {name}", &[("name", &file)]),
+                n => trn("Exported {name}; {n} kinds of content were left out", n, &[("name", &file)]),
+            });
+        }
+    });
 }
 
 /// What the Export dialog was asked to do.
