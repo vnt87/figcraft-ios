@@ -1,6 +1,6 @@
 # Hardware and platform parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (Windows QA pass; Display P3: gamut warning and soft-proof (true P3 blocked upstream); several windows; pen pressure for the Pencil and brushes on Windows and from browser styluses) · **Target:** Figma Design (desktop app 126.10.7)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-13 · **Change:** minor (iPadOS fork section; earlier: Windows QA pass; Display P3: gamut warning and soft-proof (true P3 blocked upstream); several windows; pen pressure for the Pencil and brushes on Windows and from browser styluses) · **Target:** Figma Design (desktop app 126.10.7)
 
 How FigCraft uses hardware and which platforms it runs on, against Figma. Figma's desktop app is
 Electron with a GPU helper process; its canvas renders on the GPU (WebGL, with WebGPU rolling out
@@ -46,6 +46,16 @@ Nothing has been timed against Figma on the same document (needs `.fig` import).
 | Web | primary (figma.com) | `figcraft-web` (WASM, WebGPU/WebGL2), web zip | no accessibility tree; file access through the browser |
 | iOS / Android | apps: view, comment, mirror prototypes | none (the web build is not touch-first) | 20–40 h for a viewer |
 
+## iPadOS (fork)
+
+Only what has been demonstrated. On the iPad Air 11-inch (M3) Simulator with iPadOS 26.2 (2026-10-13): the
+Debug app builds for Apple Silicon, installs, launches and draws the home screen in portrait inside the safe
+area. File pickers use `Services::begin_pick`/`poll_pick` (answered on a later frame) over UIKit's document
+picker; host tests cover that flow, the runner's storage and change tracking, but the picker itself is not yet
+exercised. Nothing has been run on a physical iPad. Not demonstrated or not wired up: opening and saving a file
+end to end, touch, Apple Pencil, an external keyboard, live sessions, multitasking, landscape, folder pickers
+(cancelled), the system clipboard, opening URLs, crash-recovery copies.
+
 ## Revision history
 
 | Date | Change | Summary |
@@ -55,3 +65,4 @@ Nothing has been timed against Figma on the same document (needs `.fig` import).
 | 2026-10-11 | minor | Several windows (gap 18): File ▸ New window, a tab's Open in new window or a tab dragged off the tab strip opens files in another window with its own tabs, panels and canvas, sharing the files, preferences, libraries and clipboard; each window draws only when it needs to (idle: ~0% CPU), closing one closes its files after asking about unsaved changes (the main window too, which takes over another window instead of quitting; the last window quits), and the control channel and MCP open, list, focus and capture windows (`window.new`, `window.list`, `window.focus`, `window` on any request); the screen-reader tree covers the main window only (eframe 0.36), so with a screen reader running files stay tabs; one window in the browser. Hardware 55% → 60%, 13–27 h → 10–21 h; gap 18 6–12 h → 4–8 h (P3 on screen left); feature breadth (~79%) and ready for real work (~47%) unchanged at this rounding; full parity ~363–697 h → ~360–691 h |
 | 2026-10-11 | minor | Stretch and scatter brushes and pen pressure landed (gap 9): eight brushes drawn in code (four stretched along the path, four scattered with spacing, size, rotation and scatter jitter from a seed) in the stroke settings, drawn everywhere strokes are and flattened by outline stroke; the Pencil records pen pressure as the stroke's width profile (Windows pens, browser styluses; macOS and Linux tablets report none) and can draw with a brush; Figma Draw extras breadth 45% → 65%, ready 30% → 45%, 10–18 h → 5–9 h; Strokes 2–4 h → 1–3 h; Hardware 50% → 55%, 15–30 h → 13–27 h; feature breadth (~79%) and ready for real work (~47%) unchanged at this rounding; full parity ~380–725 h → ~375–715 h |
 | 2026-10-10 | major | Created from the 2026-10-10 re-measure |
+| 2026-10-13 | minor | iPadOS fork section: simulator launch and home screen only; everything else listed as not demonstrated |
