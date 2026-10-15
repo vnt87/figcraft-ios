@@ -25,6 +25,42 @@ fn create_select_undo_redo() {
 }
 
 #[test]
+fn repeat_preserves_command_and_undo_steps() {
+    let mut s = sess();
+    let rid = id(&s.execute("shape.rectangle", &json!({"x": 10, "y": 20, "width": 10, "height": 10})).unwrap());
+    let params = json!({"ids": [rid], "dx": 2, "dy": 3});
+    s.execute("transform.nudge", &params).unwrap();
+    let repeated = Some(("transform.nudge".to_string(), params));
+    for count in 2..=4 {
+        s.execute("edit.repeat", &json!({})).unwrap();
+        assert_eq!(s.last_command, repeated);
+        let bounds = s.doc().unwrap().world_bounds(rid).unwrap();
+        assert_eq!((bounds.x0, bounds.y0), (10.0 + 2.0 * count as f64, 20.0 + 3.0 * count as f64));
+        assert_eq!(s.undo_depth(), (count + 1, 0));
+    }
+    for count in (0..4).rev() {
+        assert!(s.undo().unwrap());
+        let bounds = s.doc().unwrap().world_bounds(rid).unwrap();
+        assert_eq!((bounds.x0, bounds.y0), (10.0 + 2.0 * count as f64, 20.0 + 3.0 * count as f64));
+    }
+    assert_eq!(s.undo_depth(), (1, 4));
+    assert!(s.undo().unwrap());
+    assert!(!s.doc().unwrap().contains(rid));
+}
+
+#[test]
+fn repeat_rejects_missing_command_and_self_reference() {
+    for last in [None, Some(("edit.repeat".to_string(), json!({})))] {
+        let mut s = sess();
+        s.last_command = last.clone();
+        assert!(matches!(s.execute("edit.repeat", &json!({})), Err(EngineError::Disabled(cmd, _)) if cmd == "edit.repeat"));
+        assert_eq!(s.last_command, last);
+        assert_eq!(s.undo_depth(), (0, 0));
+        assert!(s.journal.is_empty());
+    }
+}
+
+#[test]
 fn node_set_and_errors_roll_back() {
     let mut s = sess();
     let rid = id(&s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
@@ -38,6 +74,36 @@ fn node_set_and_errors_roll_back() {
     assert_eq!(s.doc().unwrap().node(rid).unwrap().name, "Red");
     assert_eq!(s.ds().unwrap().history.undo.len(), undo);
     assert!(s.execute("no.such", &json!({})).is_err());
+}
+
+#[test]
+fn failed_batch_restores_all_documents_and_history() {
+    let mut s = sess();
+    let original = id(&s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
+    s.execute("file.new", &json!({"name": "Second"})).unwrap();
+    s.execute("doc.nextTab", &json!({})).unwrap();
+    let before_journal = s.journal.clone();
+    let before_history: Vec<_> = s.docs.iter().map(|d| d.history.undo.len()).collect();
+
+    let result = s.execute(
+        "command.batch",
+        &json!({
+            "label": "Broken batch",
+            "commands": [
+                {"command": "doc.nextTab"},
+                {"command": "shape.rectangle", "params": {"x": 20, "y": 20, "width": 10, "height": 10}},
+                {"command": "node.set", "params": {"id": 999999, "props": {"name": "must fail"}}}
+            ]
+        }),
+    );
+
+    assert!(result.is_err());
+    assert_eq!(s.active, 0, "the active document is part of the transaction");
+    assert_eq!(s.docs.len(), 2, "a failed batch cannot leave a newly opened tab behind");
+    assert_eq!(s.doc().unwrap().node(original).unwrap().name, "Rectangle");
+    assert_eq!(s.docs[1].doc.node(s.docs[1].page).map_or(0, |page| page.children.len()), 0);
+    assert_eq!(s.docs.iter().map(|d| d.history.undo.len()).collect::<Vec<_>>(), before_history);
+    assert_eq!(s.journal, before_journal, "failed inner commands are not journaled");
 }
 
 #[test]

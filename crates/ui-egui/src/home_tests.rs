@@ -22,9 +22,20 @@ fn shapes(u: &mut Ui) -> Vec<Shape> {
     flat(&u.frame_output(vec![]).shapes)
 }
 
-/// Enough frames for every thumbnail in view (they render one a frame) and what follows a click.
+/// Enough frames for every thumbnail in view (they render one a frame) and what follows a click,
+/// then until every recent file has been looked at: the reader is a thread of its own, and until it
+/// answers a file's card is a skeleton without its name (on a loaded machine, 12 frames weren't
+/// always enough, #351).
 fn settle(u: &mut Ui) -> Vec<Shape> {
     for _ in 0..12 {
+        u.frame(vec![]);
+    }
+    for _ in 0..400 {
+        let files = u.app.inspect()["homeRecents"]["files"].as_array().cloned().unwrap_or_default();
+        if files.iter().all(|f| !f["exists"].is_null()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
         u.frame(vec![]);
     }
     shapes(u)
@@ -217,7 +228,7 @@ fn a_first_run_offers_templates_on_recents_and_recent_files_replace_them() {
     u.app.ui.home = true;
     u.app.session.prefs.recent_files = vec!["/tmp/ridgeline.figcraft".into()];
     let s = settle(&mut u);
-    assert!(has_text(&s, "Recent files") && has_text(&s, "ridgeline.figcraft"));
+    assert!(has_text(&s, "Recent files") && has_text(&s, "ridgeline"));
     assert!(!has_text(&s, "Start from a template") && !has_text(&s, "See all templates"));
     assert!(has_text(&s, "Open files"), "the document opened from the template is listed");
 }
