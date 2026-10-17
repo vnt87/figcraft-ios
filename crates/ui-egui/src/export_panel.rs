@@ -10,12 +10,12 @@ use figcraft_doc::*;
 use figcraft_engine::cmd::file::export_jobs;
 use serde_json::{Value, json};
 
+use crate::FigApp;
 use crate::i18n::{tr, trf, trn};
 use crate::icons::{self, Icon};
 use crate::right::{common, menu_item, menu_popup, row};
 use crate::theme::{Tokens, regular};
 use crate::widgets::{self, FIELD_H};
-use crate::{FigApp, PickRequest};
 
 /// Re-render the preview at most this often (seconds) while the document changes.
 const PREVIEW_REFRESH: f64 = 0.3;
@@ -319,7 +319,7 @@ pub(crate) fn export_layers(app: &mut FigApp, ids: &[NodeId], assets: bool) {
         [one] => save_one(app, &[one.id], &one.setting, one.file.rsplit('/').next().unwrap_or(&one.file)),
         _ => {
             let ids = ids.to_vec();
-            app.pick(PickRequest::folder(tr("Export")), move |app, dir| {
+            app.pick_folder(tr("Export"), move |app, dir| {
                 if let Some(r) = app.run("file.exportLayers", json!({"ids": ids, "dir": dir.to_string_lossy(), "assets": assets})) {
                     let n = r["files"].as_array().map_or(0, Vec::len);
                     app.toast(trn("Exported {n} files", n, &[]));
@@ -332,12 +332,10 @@ pub(crate) fn export_layers(app: &mut FigApp, ids: &[NodeId], assets: bool) {
 /// Export `ids` together as one file with `setting`, through a save dialog suggesting `file`.
 pub(crate) fn save_one(app: &mut FigApp, ids: &[NodeId], setting: &ExportSetting, file: &str) {
     let ext = setting.format.ext();
-    let (ids, setting) = (ids.to_vec(), setting.clone());
-    app.pick(PickRequest::save(tr("Export"), file, &[ext]), move |app, p| {
-        let path = p.to_string_lossy().to_string();
-        let mut params = setting_params(&setting);
-        params["ids"] = json!(ids);
-        params["path"] = json!(path);
+    let mut params = setting_params(setting);
+    params["ids"] = json!(ids);
+    app.pick_save(tr("Export"), file, &[ext], move |app, p| {
+        params["path"] = json!(p.to_string_lossy());
         if app.run("file.export", params).is_some() {
             app.toast(trf("Exported {name}", &[("name", &p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default())]));
         }

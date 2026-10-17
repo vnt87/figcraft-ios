@@ -14,7 +14,7 @@ fn file_name(suggested: &str) -> Result<String, String> {
     Ok(name.to_owned())
 }
 
-fn reserve_path(root: &Path, suggested: &str) -> Result<PathBuf, String> {
+pub fn reserve_path(root: &Path, suggested: &str) -> Result<PathBuf, String> {
     let name = file_name(suggested)?;
     let documents = root.join("documents");
     std::fs::create_dir_all(&documents).map_err(|e| e.to_string())?;
@@ -202,7 +202,7 @@ impl Tracker {
 #[allow(unsafe_code)]
 mod native;
 #[cfg(target_os = "ios")]
-pub use native::{Reply, begin, prepare};
+pub use native::{Reply, open_picker, prepare};
 
 /// Takes the managed documents the app saves to where the user keeps them ([`Tracker`], and a worker
 /// that may wait for the export picker).

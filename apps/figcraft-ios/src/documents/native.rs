@@ -1,5 +1,5 @@
 //! Audited UIKit boundary. Only the save worker waits; the main event loop never does.
-use super::{ReservationBatch, bounded_read, bounded_read_limit, reserve_path, validate_managed_path};
+use super::{ReservationBatch, bounded_read, bounded_read_limit, validate_managed_path};
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2::{DefinedClass, MainThreadOnly, define_class, msg_send};
@@ -288,7 +288,7 @@ fn content_types(extensions: &[String]) -> Retained<NSArray<UTType>> {
 }
 
 /// Present the open picker on the main queue; its answer is the imported snapshots' paths.
-fn open_picker(reply: Reply, root: PathBuf, multiple: bool, extensions: Vec<String>) {
+pub fn open_picker(reply: Reply, root: PathBuf, multiple: bool, extensions: Vec<String>) {
     dispatch2::DispatchQueue::main().exec_async(move || {
         let Some(mtm) = objc2::MainThreadMarker::new() else {
             fail_completion(Completion::Open(reply, root), "UIKit main queue unavailable".into());
@@ -361,35 +361,7 @@ pub fn push(root: &Path, path: &Path) -> Result<bool, String> {
     }
 }
 
-/// Start the picker `request` describes; its answer goes to `reply`. Returns false when this kind of
-/// pick is not supported (the caller then falls back to the blocking call, which answers nothing).
-///
-/// FigCraft writes a saved file straight to the path its Save dialog answered. That path is a
-/// reserved file inside the app container; [`super::DocumentSync`] notices when it is written and takes it to
-/// the place the user chose (the export picker the first time, the remembered destination after).
-pub fn begin(request: &figcraft_ui_egui::PickRequest, root: &Path, reply: Reply) -> bool {
-    use figcraft_ui_egui::PickKind;
-    match request.kind {
-        PickKind::Save => {
-            let suggested = if request.name.is_empty() { "Untitled.figcraft" } else { request.name.as_str() };
-            match reserve_path(root, suggested)
-                .and_then(|p| p.to_str().map(str::to_owned).ok_or_else(|| "Non-Unicode managed document path".to_string()))
-            {
-                Ok(path) => reply.send(vec![path]),
-                Err(error) => {
-                    log::error!("Could not reserve a document for saving: {error}");
-                    reply.send(Vec::new());
-                }
-            }
-            true
-        }
-        PickKind::Open => {
-            open_picker(reply, root.to_owned(), false, request.exts.clone());
-            true
-        }
-        PickKind::Folder => false,
-    }
-}
+
 
 /// Create the folder the managed documents live in.
 pub fn prepare(root: &Path) -> Result<(), String> {

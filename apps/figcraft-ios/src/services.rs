@@ -1,10 +1,13 @@
 //! The iPadOS platform services FigCraft's UI asks for: document pickers (UIKit's, answering on a
 //! later frame) and the preferences kept in the app container.
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::mpsc;
+use std::task::{Context, Poll};
 
 use figcraft_engine::Prefs;
-use figcraft_ui_egui::{PickRequest, Services};
+use figcraft_ui_egui::{DialogFuture, Services};
 use serde_json::{Value, json};
 
 /// The preferences' file in the support folder.
@@ -54,43 +57,54 @@ fn write_prefs(root: &std::path::Path, prefs: &Prefs) {
     }
 }
 
+struct ReceiverFuture(mpsc::Receiver<Option<PathBuf>>);
+
+impl Future for ReceiverFuture {
+    type Output = Option<PathBuf>;
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.0.try_recv() {
+            Ok(answer) => Poll::Ready(answer),
+            Err(mpsc::TryRecvError::Empty) => Poll::Pending,
+            Err(mpsc::TryRecvError::Disconnected) => Poll::Ready(None),
+        }
+    }
+}
+
 pub struct Ios {
     root: Option<PathBuf>,
     ui: egui::Context,
-    answers: Option<mpsc::Receiver<Option<PathBuf>>>,
 }
 
 impl Ios {
     pub fn new(root: Option<PathBuf>, ui: egui::Context) -> Self {
-        Self { root, ui, answers: None }
+        Self { root, ui }
     }
 }
 
 impl Services for Ios {
-    fn begin_pick(&mut self, request: &PickRequest) -> bool {
-        let Some(root) = &self.root else { return false };
+    fn pick_open(&mut self, _title: &str, exts: &[&str]) -> DialogFuture {
+        let Some(root) = &self.root else {
+            return Box::pin(std::future::ready(None));
+        };
         let (tx, rx) = mpsc::channel();
-        if !crate::documents::begin(request, root, crate::documents::Reply::new(tx, self.ui.clone())) {
-            return false;
-        }
-        self.answers = Some(rx);
-        true
+        let reply = crate::documents::Reply::new(tx, self.ui.clone());
+        let extensions = exts.iter().map(|e| (*e).to_owned()).collect();
+        crate::documents::open_picker(reply, root.clone(), false, extensions);
+        Box::pin(ReceiverFuture(rx))
     }
 
-    fn poll_pick(&mut self) -> Option<Option<PathBuf>> {
-        let answers = self.answers.as_ref()?;
-        match answers.try_recv() {
-            Ok(answer) => {
-                self.answers = None;
-                Some(answer)
-            }
-            Err(mpsc::TryRecvError::Empty) => None,
-            // The picker went away without answering: that is a cancel.
-            Err(mpsc::TryRecvError::Disconnected) => {
-                self.answers = None;
-                Some(None)
-            }
-        }
+    fn pick_save(&mut self, _title: &str, name: &str, _exts: &[&str]) -> DialogFuture {
+        let Some(root) = &self.root else {
+            return Box::pin(std::future::ready(None));
+        };
+        let suggested = if name.is_empty() { "Untitled.figcraft" } else { name };
+        let path = crate::documents::reserve_path(root, suggested).ok();
+        Box::pin(std::future::ready(path))
+    }
+
+    fn pick_folder(&mut self, _title: &str) -> DialogFuture {
+        Box::pin(std::future::ready(None))
     }
 
     fn save_prefs(&mut self, prefs: &Prefs) {
