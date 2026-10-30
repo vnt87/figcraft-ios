@@ -18,10 +18,6 @@ and web builds, downloads, the other Crafting Apps, contributing), read the upst
   and system-font indexing as on the desktop). Open imports a copy of the file into the app container and
   remembers where it came from; Save reserves a file there, and a change tracker takes each saved document
   to the export picker the first time and to the remembered location after.
-- **Pickers that answer later** (`crates/ui-egui/src/picks.rs`): `Services` gains `begin_pick` and
-  `poll_pick`, because UIDocumentPicker needs the main thread's run loop that egui draws on, so a blocking
-  `pick_open` would deadlock. Platforms that do not implement them (desktop, web) keep the blocking calls
-  and behave as before.
 - **`packaging/ios`**: the Xcode project that links the library into an iPad app bundle, with a bundle
   validator and tests. See its [README](packaging/ios/README.md).
 - **`cargo xtask ios`**: build, install and launch on the Simulator or a physical iPad
