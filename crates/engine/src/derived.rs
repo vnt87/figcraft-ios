@@ -38,8 +38,13 @@ pub fn normalize(doc: &mut Document, before: &Document) {
     if touched.is_empty() && doc.variables == before.variables && doc.styles == before.styles {
         return;
     }
+    let revalued = doc.variables != before.variables;
+    // Extended collections follow edits of the collections they extend in this file.
+    if revalued {
+        cmd::variables::sync_extensions(doc);
+    }
     let m = measure::TextMeasure;
-    let restyled = doc.variables != before.variables || doc.styles != before.styles;
+    let restyled = revalued || doc.styles != before.styles;
     // Layers that only moved join from step 3 on: what sits around them may follow, they don't.
     let moved = if restyled { BTreeSet::new() } else { only_moved_layers(doc, before, &touched) };
     touched.retain(|id| !moved.contains(id));
@@ -161,6 +166,7 @@ pub fn normalize(doc: &mut Document, before: &Document) {
     touched.extend(doc.take_dirty());
     // 4b. Board connectors follow the layers they join; their labels sit at their middles.
     board::settle_routes(doc, before, &touched);
+    board::settle_stamps(doc, before, &touched);
     touched.extend(doc.take_dirty());
     // 5. Ready-for-dev layers whose contents changed show "Changed".
     mark_dev_changes(doc, before, &touched);

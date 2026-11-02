@@ -77,6 +77,10 @@ pub(super) fn overlays(app: &FigApp, painter: &egui::Painter, t: &Tokens) -> Vec
     {
         quad(painter, q, stroke(if figcraft_engine::components::is_slot(&doc, d) { COMPONENT } else { accent(painter) }, 1.0));
     }
+    // Boards: the object a stamp would stick to, outlined as a hovered layer is.
+    if let Some(s) = ov.stamp_target {
+        draw_outline(app, painter, &doc, s, stroke(outline_colour(&doc, s, accent(painter)), 1.5));
+    }
     slot_badges(app, painter, &doc, &sel, ov.drop_target);
     attach_points(app, painter, &ov.attach);
     if let Some(t) = ov.swap_target {
@@ -357,6 +361,13 @@ fn selection_overlay(
             handles,
             (!measuring && connector.is_none()).then_some(label),
         );
+        // Its path handles, one for each portion that can be dragged.
+        let paths = if app.session.tool.dev_mode { Vec::new() } else { figcraft_engine::board::selected_connector_handles(doc, sel, zoom) };
+        for (_, at) in paths {
+            let c = app.to_screen(at.x, at.y);
+            painter.circle_filled(c, 3.5, col);
+            painter.circle_stroke(c, 3.5, stroke(Color32::WHITE, 1.0));
+        }
         for end in connector.into_iter().flatten().filter(|_| !app.session.tool.dev_mode) {
             let c = app.to_screen(end.x, end.y);
             painter.circle_filled(c, 5.0, Color32::WHITE);
