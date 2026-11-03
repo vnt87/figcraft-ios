@@ -53,13 +53,22 @@ Debug app builds for Apple Silicon, installs, launches and draws the home screen
 area. File pickers use the async `Services::pick_open`/`pick_save`/`pick_folder` (`DialogFuture`) over UIKit's
 document picker; host tests cover the runner's storage and change tracking, but the picker itself is not yet
 exercised. Nothing has been run on a physical iPad. Not demonstrated or not wired up: opening and saving a file
-end to end, touch, Apple Pencil, an external keyboard, live sessions, multitasking, landscape, folder pickers
+end to end, touch, Apple Pencil, live sessions, multitasking, landscape, folder pickers
 (cancelled), the system clipboard, opening URLs, crash-recovery copies.
+
+Hardware keyboard (a Logitech Folio, say). iPadOS hands a UIKit app only the characters it types and Backspace,
+so Enter, the arrows, Esc and the ⌘ shortcuts reached nothing. The runner now reads the keyboard through
+GameController and injects what iPadOS withholds — Enter, arrows, Home/End, Page Up/Down, Delete, Esc, Tab,
+F-keys, the ⌘/Ctrl chords with their modifiers, and key repeat (`apps/figcraft-ios/src/gc_keyboard.rs` and
+`hw_keys.rs`; host-tested, and a hardware ⌘Z is asserted to resolve to `edit.undo` in FigCraft's own keymap).
+Not yet verified on a device. Known gap: ⌘/Option+Backspace (delete word or line) is still the plain Backspace
+UIKit types.
 
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-03 | minor | iPadOS hardware keyboard: the runner reads the keyboard through GameController and injects the keys iPadOS withholds from winit (Enter, arrows, Esc, Home/End, Page Up/Down, Delete, Tab, F-keys, ⌘/Ctrl chords, modifiers, key repeat), so shortcuts work with a Folio attached. Host-tested, not yet run on a device |
 | 2026-10-31 | minor | M1, #492: Web row: the browser pastes images copied in other apps, read from the paste event under the same limits as the desktop. Numbers unchanged. |
 | 2026-10-30 | minor | M8: text reads only the fallback fonts it draws with. Each fallback family reads the face nearest a run's style, not all of them (Noto Sans CJK is seven files of 16–20 MB); families naming the faces of one file share its bytes; and the faces are worked out once per style until fonts change, not for every text laid out. First text laid out on a Linux machine with Noto Sans CJK, DejaVu Sans and Inter: 41 files (265 MiB, kept in memory) and 41 faces parsed → 3 files (20 MiB) and 4 faces; fallback lookups per text laid out ~45 µs → 0.2 µs. Tests: `fontdb_fallback_tests`. Numbers unchanged |
 | 2026-10-30 | minor | M8, #1117: AI agents and plugins no longer learn where the open files are on disk from `doc.list`. Numbers unchanged. |
