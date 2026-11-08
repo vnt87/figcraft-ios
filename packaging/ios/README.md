@@ -19,6 +19,35 @@ the bundle identifier for both build and launch when the product id cannot be re
 team. It does not require a desktop viewer. Xcode 27 provides Device Hub;
 `--show-simulator` currently targets the older Simulator application.
 
+## Signing a physical-device build
+
+`cargo xtask ios --device` signs with a team that your Apple account can sign for in Xcode.
+Before the first device build:
+
+1. **Find the team ID.** The team is the certificate's organisational unit (`OU`), not the value
+   in parentheses in its name. The parentheses hold the certificate's own ID. Read the `OU` from
+   your signing certificate:
+
+   ```sh
+   security find-certificate -c "Apple Development: <your name>" -p | openssl x509 -noout -subject
+   ```
+
+2. **Sign in to that team in Xcode.** Open Xcode ▸ Settings ▸ Accounts and add the Apple ID that
+   belongs to the team. "No Account for Team …" means this step is missing.
+
+3. **Check the team and bundle identifier.** `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER`
+   in `packaging/ios/FigCraft.xcodeproj/project.pbxproj` are the project's defaults. A bundle
+   identifier belongs to one team. If Xcode reports "No profiles for '<bundle id>'", your team
+   can't sign that identifier: pass `--bundle-id` with an identifier your team owns.
+
+4. **Connect the iPad.** Unlock it, trust this computer, and turn on Developer Mode under
+   Settings ▸ Privacy & Security. `xcrun devicectl list devices` should show it as `connected`.
+   Use its identifier with `--device-id`.
+
+```sh
+cargo xtask ios --device --device-id <device id> --team <team id> [--bundle-id <id>]
+```
+
 The build phase resolves Cargo from `CARGO` or `$HOME/.cargo/bin` and builds only
 `--lib`. It maps arm64 device, arm64 Simulator, and Intel Simulator architectures
 and creates a universal archive when Xcode requests multiple architectures.
