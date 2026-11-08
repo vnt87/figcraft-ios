@@ -181,6 +181,57 @@ fn pan_view(app: &mut FigApp, ctx: &egui::Context, pos: Pos2, mods: &egui::Modif
     }
 }
 
+/// A finger on the canvas (not the Pencil): where the tool has nothing to grab a press is a tap
+/// and a drag pans ([`super::touch`]). True while such a finger is down, and the frame it lifts.
+fn finger(app: &mut FigApp, ctx: &egui::Context, resp: &egui::Response, pos: Pos2, mods: &egui::Modifiers) -> bool {
+    use super::touch::{Finger, TAP_SLOP, pencil_down, tool_takes};
+    let (pressed, down, touched, press_pos, release_pos) = ctx.input(|i| {
+        let (mut touched, mut press, mut release) = (false, None, None);
+        for e in &i.events {
+            match e {
+                egui::Event::Touch { phase: egui::TouchPhase::Start, .. } => touched = true,
+                egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, .. } => {
+                    if *pressed {
+                        press = Some(*pos);
+                    } else {
+                        release = Some(*pos);
+                    }
+                }
+                _ => {}
+            }
+        }
+        (i.pointer.button_pressed(egui::PointerButton::Primary), i.pointer.primary_down(), touched, press, release)
+    });
+    if pressed && touched && resp.hovered() && app.canvas.finger.is_none() && !app.canvas.dragging && !pencil_down(ctx) {
+        let at = press_pos.unwrap_or(pos);
+        if !tool_takes(app, at) {
+            app.canvas.finger = Some(super::touch::Finger { start: at, panning: false });
+            app.ui.context_menu = None;
+            app.ui.tool_flyout = None;
+        }
+    }
+    let Some(Finger { start, panning }) = app.canvas.finger else {
+        return false;
+    };
+    if !down {
+        // Lifted: a tap is a click for the tool; a pan just ends.
+        app.canvas.finger = None;
+        app.canvas.middle_pan = None;
+        if !panning {
+            send(app, PointerKind::Down, start, mods);
+            send(app, PointerKind::Up, release_pos.unwrap_or(start), mods);
+        }
+        return true;
+    }
+    if !panning && pos.distance(start) > TAP_SLOP {
+        app.canvas.finger = Some(Finger { start, panning: true });
+    }
+    if app.canvas.finger.is_some_and(|f| f.panning) {
+        pan_view(app, ctx, pos, mods, false);
+    }
+    true
+}
+
 /// The pointer and keys on the canvas. False when something on it with a cursor of its own has
 /// the pointer (a comment pin, a ruler guide, a gradient or padding handle): the tool's cursor
 /// then doesn't show.
@@ -253,6 +304,13 @@ pub(super) fn input(app: &mut FigApp, ui: &mut Ui, resp: &egui::Response) -> boo
             ds.view.scroll(f64::from(scroll.x), f64::from(scroll.y), mods.shift);
             ds.revision += 1;
         }
+    }
+    // A second finger drops what the first began; until the last finger lifts the pointer is left alone.
+    if super::touch::second_finger(app, &ctx) {
+        return true;
+    }
+    if finger(app, &ctx, resp, pos, &mods) {
+        return true;
     }
     if zoom_tool(app, ui, resp, pos, mods, editing_text || typing_elsewhere) {
         return true;
