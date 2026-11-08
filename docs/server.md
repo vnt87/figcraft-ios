@@ -782,6 +782,36 @@ docker run -d --name figcraft-server --restart unless-stopped -p 127.0.0.1:47900
 docker exec figcraft-server /usr/local/bin/figcraft-server --config /etc/figcraft-server/server.toml key
 ```
 
+**With Docker Compose (a home server, on a LAN or tailnet).** [`packaging/server/docker-compose.yml`](../packaging/server/docker-compose.yml)
+runs the same image from a clone, with the files in a folder on the host. It publishes the port on
+every interface, so devices on your LAN or tailnet can reach it. Setup from a fresh clone:
+
+```sh
+git clone -b <branch> <your repository URL> figcraft
+cd figcraft/packaging/server
+mkdir -p data && sudo chown 65532:65532 data   # or set FIGCRAFT_UID/FIGCRAFT_GID in .env to your own
+cp .env.example .env                            # set FIGCRAFT_PUBLIC_URL, e.g. ws://192.168.1.20:47900/
+docker compose up -d --build
+docker compose exec figcraft-server figcraft-server --config /etc/figcraft-server/server.toml --public-url "ws://192.168.1.20:47900/" key
+```
+
+The last command prints the publish address. Pass `--public-url` with the **same** value as
+`FIGCRAFT_PUBLIC_URL` in `.env`: `docker compose exec` doesn't read `.env`, and without the flag the
+server names its own container address. Put the printed address under **Preferences ▸ Server for
+online sharing** on each device. Then, in FigCraft, use **File ▸ Publish to server…** and **Share ▸
+Online ▸ Start sharing** for each file you want to appear in the other devices' **Home ▸ Online** list.
+
+- **Data.** Files and `server.key` live in `FIGCRAFT_DATA` (`./data` by default), outside the image and
+  outside git. To back up, stop the server first (`docker compose stop`), copy the folder, then
+  `docker compose start`.
+- **Upgrade.** `git pull`, then `docker compose up -d --build`. The restart is graceful.
+- **Limits of this setup.** There are no accounts: anyone who reaches the port can open and edit every
+  file shared from it (`team_files = "edit"` in `server.docker.toml`). Keep it on a private network.
+  Don't point a public tunnel at it without an access layer in front (for example Cloudflare Access):
+  every shared file would be open to anyone who reaches the tunnel.
+- **Not built yet.** Files don't appear in the list until they are shared, there are no per-device
+  credentials, and nothing syncs to a device in the background or keeps files for offline use.
+
 **Upgrading.** Install the new binary as in step 1, then restart: the restart is graceful and apps
 reconnect on their own. An app speaking another protocol version is refused with a message saying
 so: upgrade apps and server together when the release notes say the protocol changed.

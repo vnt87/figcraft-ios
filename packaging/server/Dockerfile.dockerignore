@@ -7,3 +7,6 @@ plan
 plans
 corpus
 log
+# A Compose deployment's data (files and the server key) and its local settings: never in an image.
+packaging/server/data
+packaging/server/.env

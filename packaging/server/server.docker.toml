@@ -1,0 +1,18 @@
+# Settings for the Docker image, mounted read-only at /etc/figcraft-server/server.toml.
+# FIGCRAFT_PUBLIC_URL (from .env) reaches the server as --public-url; the port and bind address
+# are chosen in .env, not here.
+
+# Listen on every interface inside the container. Which host addresses reach it is up to the
+# port mapping in docker-compose.yml.
+listen = "0.0.0.0:47900"
+
+# The bind-mounted data folder.
+data = "/data"
+
+# Design files with images are often larger than the 64 MiB default for a private server.
+max_file_mb = 256
+
+# Every file shared from this server is listed for, and opened by, everyone who can reach it.
+# Reaching the server is the login, so keep it on a private network. A public tunnel in front of
+# it would expose every shared file; read docs/server.md before adding one.
+team_files = "edit"

@@ -1,0 +1,3 @@
+# Local settings and the server's data (files and server.key): never committed.
+.env
+data/
