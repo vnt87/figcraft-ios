@@ -123,6 +123,9 @@ pub fn run() -> Result<(), String> {
                 }
                 let mut fig = FigApp::new(session, Box::new(services::Ios::new(root.clone(), cc.egui_ctx.clone())));
                 fig.ui.home = false;
+                // The app is iPad-only (TARGETED_DEVICE_FAMILY = 2): the bottom bar clears the home
+                // indicator and carries Undo and Redo.
+                fig.ui.ipad = true;
                 figcraft_ui_egui::windows::install(fig);
                 Ok(Box::new(app::IosApp::new(root)))
             }),

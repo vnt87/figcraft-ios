@@ -109,7 +109,7 @@ pub fn show(app: &mut FigApp, ctx: &egui::Context) {
     let t = Tokens::get(ctx);
     let accent = crate::theme::canvas_accent(ctx);
     // Not over the toolbar at the bottom of the canvas.
-    let toolbar = crate::toolbar::pill_rect(app.canvas.rect, crate::toolbar::bar_width(app)).expand(RADIUS);
+    let toolbar = crate::toolbar::pill_rect(crate::toolbar::dock(app), crate::toolbar::bar_width(app)).expand(RADIUS);
     let mut picked = None;
     let mut started = None;
     let mut let_go = false;

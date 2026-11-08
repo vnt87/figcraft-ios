@@ -45,6 +45,8 @@ mod board_picker_tests;
 #[cfg(test)]
 mod board_ui_tests;
 #[cfg(test)]
+mod ipad_bar_tests;
+#[cfg(test)]
 mod theme_startup_tests;
 
 #[cfg(test)]
@@ -519,6 +521,9 @@ pub struct UiState {
     pub layers_seen_sel: Vec<NodeId>,
     pub dark: bool,
     pub follow_system: bool,
+    /// Running on an iPad (set by the iPad runner): the bottom bar clears the home indicator and
+    /// carries Undo and Redo ([`toolbar::dock`]). Desktop, web and phone keep the bar as it was.
+    pub ipad: bool,
     pub tool_flyout: Option<&'static str>,
     /// On a board: the Design panel is shown (boards hide it until asked for).
     pub board_panel: bool,
@@ -694,6 +699,7 @@ impl Default for UiState {
             dark: false,
             follow_system: false,
             tool_flyout: None,
+            ipad: false,
             board_panel: false,
             last_error: None,
             pending_opens: Vec::new(),
