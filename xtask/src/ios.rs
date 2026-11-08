@@ -24,13 +24,16 @@ usage: cargo xtask ios (--sim | --device) [--release] [options]
                       also read from $FIGCRAFT_IOS_TEAM
   --bundle-id ID      override the bundle identifier (PRODUCT_BUNDLE_IDENTIFIER) for the build and
                       the launch, e.g. a team-unique development id when the canonical one cannot
-                      be registered to your team; also read from $FIGCRAFT_IOS_BUNDLE_ID
+                      be registered to your team; also read from $FIGCRAFT_IOS_BUNDLE_ID.
+                      Without it, the project file's own identifier is used.
   -h, --help          print this help
 
 --sim and --device need macOS with Xcode and the Rust targets aarch64-apple-ios,
 aarch64-apple-ios-sim (and x86_64-apple-ios). See packaging/ios/README.md.
 ";
 
+/// Fallback bundle id, used only when the project file can't be read. Normally the build and the
+/// launch both use the project's own `PRODUCT_BUNDLE_IDENTIFIER` (see [`project_bundle_id`]).
 pub const BUNDLE_ID: &str = "ai.storyteller.figcraft";
 const PROJECT: &str = "packaging/ios/FigCraft.xcodeproj";
 const SCHEME: &str = "FigCraft";
@@ -53,8 +56,10 @@ pub struct Options {
     pub show_simulator: bool,
     pub device_id: Option<String>,
     pub team: Option<String>,
-    /// Bundle id override; `None` keeps the project's canonical [`BUNDLE_ID`].
+    /// Bundle id override from `--bundle-id` or `FIGCRAFT_IOS_BUNDLE_ID`.
     pub bundle_id: Option<String>,
+    /// The bundle id the project file sets, read by [`run`]. Used when there is no override.
+    pub project_bundle_id: Option<String>,
 }
 
 /// Result of argument parsing.
@@ -126,7 +131,18 @@ pub fn parse(args: &[&str], env: Env) -> Result<Parsed, String> {
         device_id: device_id.or_else(|| clean(env.device)),
         team: team.or_else(|| clean(env.team)),
         bundle_id: bundle_id.or_else(|| clean(env.bundle_id)),
+        project_bundle_id: None,
     }))
+}
+
+/// The `PRODUCT_BUNDLE_IDENTIFIER` the project file sets, or `None` if it sets none. Pure: takes
+/// the file's text. Quotes around the value are removed.
+pub fn project_bundle_id(pbxproj: &str) -> Option<String> {
+    pbxproj.lines().find_map(|line| {
+        let value = line.trim().strip_prefix("PRODUCT_BUNDLE_IDENTIFIER")?.trim_start().strip_prefix('=')?;
+        let value = value.trim().trim_end_matches(';').trim().trim_matches('"').trim();
+        (!value.is_empty()).then(|| value.to_string())
+    })
 }
 
 /// One external command.
@@ -172,9 +188,10 @@ pub struct Plan {
     pub notes: Vec<String>,
 }
 
-/// The bundle id the build is signed with and the launch step targets.
+/// The bundle id the build is signed with and the launch step targets: the override if given,
+/// else the project file's value, else [`BUNDLE_ID`].
 pub fn bundle_id(o: &Options) -> &str {
-    o.bundle_id.as_deref().unwrap_or(BUNDLE_ID)
+    o.bundle_id.as_deref().or(o.project_bundle_id.as_deref()).unwrap_or(BUNDLE_ID)
 }
 
 pub fn configuration(o: &Options) -> &'static str {
@@ -296,13 +313,14 @@ pub fn run(root: &Path, args: &[&str]) -> Result<(), String> {
     let env_team = std::env::var("FIGCRAFT_IOS_TEAM").ok();
     let env_bundle = std::env::var("FIGCRAFT_IOS_BUNDLE_ID").ok();
     let env = Env { device: env_device.as_deref(), team: env_team.as_deref(), bundle_id: env_bundle.as_deref() };
-    let o = match parse(args, env)? {
+    let mut o = match parse(args, env)? {
         Parsed::Help => {
             print!("{USAGE}");
             return Ok(());
         }
         Parsed::Run(o) => o,
     };
+    o.project_bundle_id = std::fs::read_to_string(root.join(PROJECT).join("project.pbxproj")).ok().and_then(|text| project_bundle_id(&text));
     let p = plan(&o);
     if o.dry_run {
         print!("{}", render(&p));
@@ -442,6 +460,38 @@ mod tests {
         assert_eq!(p.steps.last().expect("launch").args.last().map(String::as_str), Some("dev.example.app"));
         let p = plan(&opts(&["--sim"]));
         assert!(!p.steps[0].display().contains("PRODUCT_BUNDLE_IDENTIFIER"));
+    }
+
+    #[test]
+    fn default_bundle_id_follows_the_project_file() {
+        // Regression: the launch step used a hard-coded id that didn't match the project's own
+        // PRODUCT_BUNDLE_IDENTIFIER, so the app was installed but "not installed" at launch.
+        let pbxproj = "\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = dev.example.team.app;\n";
+        let mut o = opts(&["--device", "--device-id", "D"]);
+        o.project_bundle_id = project_bundle_id(pbxproj);
+        let p = plan(&o);
+        assert_eq!(p.steps.last().expect("launch").args.last().map(String::as_str), Some("dev.example.team.app"));
+        assert!(!p.steps[0].display().contains("PRODUCT_BUNDLE_IDENTIFIER"));
+        let mut o = opts(&["--sim"]);
+        o.project_bundle_id = project_bundle_id(pbxproj);
+        assert_eq!(plan(&o).steps.last().expect("launch").args.last().map(String::as_str), Some("dev.example.team.app"));
+        // An explicit override still wins over the project file.
+        let mut o = opts(&["--sim", "--bundle-id", "dev.override"]);
+        o.project_bundle_id = project_bundle_id(pbxproj);
+        assert_eq!(plan(&o).steps.last().expect("launch").args.last().map(String::as_str), Some("dev.override"));
+    }
+
+    #[test]
+    fn project_bundle_id_is_read_from_pbxproj_text() {
+        assert_eq!(
+            project_bundle_id("\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = ai.storyteller.figcraft.dev.t5cckbxfs8;\n"),
+            Some("ai.storyteller.figcraft.dev.t5cckbxfs8".to_string())
+        );
+        assert_eq!(project_bundle_id("PRODUCT_BUNDLE_IDENTIFIER = \"quoted.id\";"), Some("quoted.id".to_string()));
+        assert_eq!(project_bundle_id("PRODUCT_NAME = FigCraft;\n"), None);
+        assert_eq!(project_bundle_id("PRODUCT_BUNDLE_IDENTIFIER = ;"), None);
+        // Without a project file value, the fallback applies.
+        assert_eq!(bundle_id(&opts(&["--sim"])), BUNDLE_ID);
     }
 
     #[test]
