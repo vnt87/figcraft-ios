@@ -114,7 +114,7 @@ fn remembered(ui: &Ui, key: &str, default: ToolId) -> ToolId {
 
 pub fn show(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    let canvas = app.canvas.rect;
+    let canvas = dock(app);
     app.ui.actions_rect = None;
     // A file you can't edit now (view only, or on its way to a server): moving around only.
     if let Some(why) = app.session.active_read_only() {
@@ -135,11 +135,54 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
     main_toolbar(app, ui, canvas, &t, board);
 }
 
+/// How far the iPad's bottom bar sits above where it sits elsewhere, so a finger on it stays out of
+/// the home indicator's swipe zone: 12 pt of margin becomes 56. (On a real iPad the canvas runs to
+/// the bottom of the screen, 20 pt past the safe area, so this is measured from the screen's edge.)
+pub(crate) const IPAD_LIFT: f32 = 44.0;
+
+/// The canvas the toolbar docks to: the canvas itself, or on an iPad the canvas less [`IPAD_LIFT`]
+/// at the bottom, so the bar (and the help button and Actions palette placed from it) float higher.
+pub(crate) fn dock(app: &FigApp) -> Rect {
+    let mut r = app.canvas.rect;
+    if app.ui.ipad && r.is_finite() {
+        r.max.y -= IPAD_LIFT;
+    }
+    r
+}
+
+/// Width of the iPad's Undo and Redo buttons and the divider after them (none elsewhere).
+pub(crate) fn history_width(app: &FigApp) -> f32 {
+    if app.ui.ipad { 2.0 * TOOL_CELL + GAP + DIVIDER + GAP } else { 0.0 }
+}
+
+/// The iPad's Undo and Redo buttons from `x`, greyed while there is nothing to undo or redo, and
+/// the divider after them. Where the tools start.
+fn history_buttons(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) -> f32 {
+    let (undo, redo) = app.session.undo_depth();
+    let cells = [(Icon::Undo, "edit.undo", tr("Undo"), undo > 0), (Icon::Redo, "edit.redo", tr("Redo"), redo > 0)];
+    for (i, (icon, id, label, enabled)) in cells.into_iter().enumerate() {
+        let r = Rect::from_center_size(pos2(x + (i as f32 + 0.5) * TOOL_CELL, cy), vec2(TOOL_CELL, TOOL_CELL));
+        let resp = ui.interact(r, ui.scope_id().with(("history", id)), Sense::click());
+        a11y::toggle(&resp, label, false);
+        if enabled && resp.hovered() {
+            ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+        }
+        let tint = if enabled { t.icon } else { t.icon.gamma_multiply(0.35) };
+        icons::paint(ui.painter(), glyph_rect(r), icon, tint);
+        if enabled && resp.clicked() {
+            app.run(id, json!({}));
+        }
+    }
+    let x = x + 2.0 * TOOL_CELL + GAP;
+    divider(ui, t, x, cy);
+    x + DIVIDER + GAP
+}
+
 /// The main toolbar pill's width for the active file: the Actions palette matches it so the two
 /// read as one bar.
 pub(crate) fn bar_width(app: &FigApp) -> f32 {
     let board = app.session.doc().is_ok_and(figcraft_engine::board::is_board);
-    main_width(if board { BOARD_GROUPS } else { GROUPS }, board)
+    main_width(if board { BOARD_GROUPS } else { GROUPS }, board) + history_width(app)
 }
 
 /// The main toolbar pill's width: the tool groups with their flyout carets, Actions, the divider
@@ -156,13 +199,16 @@ fn main_width(groups: &[Group], board: bool) -> f32 {
 /// Draw · Design · Prototype · Inspect mode switcher (on a board, its two buttons).
 fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: bool) {
     let groups = if board { BOARD_GROUPS } else { GROUPS };
-    let width = main_width(groups, board);
+    let width = main_width(groups, board) + history_width(app);
     let rect = pill(ui, &mut app.ui.nav, canvas, width, t);
     let cy = rect.center().y;
     let scroll = pill_scroll(ui, rect, width);
     let outer_clip = ui.clip_rect();
     ui.set_clip_rect(rect.intersect(outer_clip));
     let mut x = rect.min.x + PAD - scroll;
+    if app.ui.ipad {
+        x = history_buttons(app, ui, x, cy, t);
+    }
     for g in groups {
         x = group_cell(app, ui, g, pos2(x, cy), rect.min.y, t);
     }
@@ -373,7 +419,8 @@ fn view_only_toolbar(app: &mut FigApp, ui: &mut Ui, why: &'static str) {
     let text = ui.painter().layout_no_wrap(label.to_string(), crate::theme::semibold(11.5), t.text);
     let badge_w = 12.0 + 14.0 + 6.0 + text.size().x + 12.0;
     let width = PAD * 2.0 + tools.len() as f32 * (TOOL_CELL + GAP) + DIVIDER + GAP + badge_w;
-    let rect = pill(ui, &mut app.ui.nav, app.canvas.rect, width, &t);
+    let anchor = dock(app);
+    let rect = pill(ui, &mut app.ui.nav, anchor, width, &t);
     let cy = rect.center().y;
     let mut x = rect.min.x + PAD;
     for &(tool, icon) in tools {
@@ -400,7 +447,7 @@ fn view_only_toolbar(app: &mut FigApp, ui: &mut Ui, why: &'static str) {
 /// The pill shown in vector edit mode: the edit tools and Done.
 fn edit_toolbar(app: &mut FigApp, ui: &mut Ui, current: VTool) {
     let t = Tokens::get(ui.ctx());
-    let canvas = app.canvas.rect;
+    let canvas = dock(app);
     let width = VTool::ALL.len() as f32 * (TOOL_CELL + GAP) + PAD * 2.0 + DIVIDER + GAP + DONE_W;
     let rect = pill(ui, &mut app.ui.nav, canvas, width, &t);
     let cy = rect.center().y;
@@ -454,7 +501,8 @@ fn builder_toolbar(app: &mut FigApp, ui: &mut Ui) {
     };
     let galley = ui.painter().layout_no_wrap(hint, regular(12.0), t.text_secondary);
     let width = PAD * 2.0 + 2.0 * (TOOL_CELL + GAP) + 2.0 * (DIVIDER + GAP) + galley.size().x + GAP + DONE_W;
-    let rect = pill(ui, &mut app.ui.nav, app.canvas.rect, width, &t);
+    let anchor = dock(app);
+    let rect = pill(ui, &mut app.ui.nav, anchor, width, &t);
     let cy = rect.center().y;
     let mut x = rect.min.x + PAD;
     for (mode, icon, tip) in [("merge", Icon::ShapeBuilder, tr("Merge regions")), ("remove", Icon::ShapeBuilderRemove, tr("Remove regions"))] {

@@ -85,6 +85,7 @@ pub use sharing::invite_links;
 pub use sharing::live;
 pub use sharing::online;
 pub use sharing::team;
+pub use sharing::workspace;
 
 pub use batch::{BatchScope, BatchStep};
 pub use cmd::{CommandSpec, all_commands, find_command};
@@ -652,6 +653,8 @@ mod widget_panel_tests;
 mod widget_shapes_tests;
 #[cfg(test)]
 mod widgets_tests;
+#[cfg(test)]
+mod workspace_tests;
 
 #[cfg(test)]
 mod selection_reorder_tests;

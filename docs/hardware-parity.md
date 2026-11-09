@@ -46,10 +46,29 @@ Nothing has been timed against Figma on the same document (needs `.fig` import).
 | Web | primary (figma.com) | `figcraft-web` (WASM, WebGPU/WebGL2), web zip | no accessibility tree; file access through the browser; copy and paste through the system clipboard (copies written from the copy event, pastes read from the paste event, its text or an image copied in another app); an internal error stops the page (a panic can't be caught there), but its unsaved files are kept in the page's local storage (about 5 MB) and open again on reload (#1123) |
 | iOS / Android | apps: view, comment, mirror prototypes | none (the web build is not touch-first) | 20–40 h for a viewer |
 
+## iPadOS (fork)
+
+Only what has been demonstrated. On the iPad Air 11-inch (M3) Simulator with iPadOS 26.2 (2026-10-13): the
+Debug app builds for Apple Silicon, installs, launches and draws the home screen in portrait inside the safe
+area. File pickers use the async `Services::pick_open`/`pick_save`/`pick_folder` (`DialogFuture`) over UIKit's
+document picker; host tests cover the runner's storage and change tracking, but the picker itself is not yet
+exercised. Nothing has been run on a physical iPad. Not demonstrated or not wired up: opening and saving a file
+end to end, touch, Apple Pencil, live sessions, multitasking, landscape, folder pickers
+(cancelled), the system clipboard, opening URLs, crash-recovery copies.
+
+Hardware keyboard (a Logitech Folio, say). iPadOS hands a UIKit app only the characters it types and Backspace,
+so Enter, the arrows, Esc and the ⌘ shortcuts reached nothing. The runner now reads the keyboard through
+GameController and injects what iPadOS withholds — Enter, arrows, Home/End, Page Up/Down, Delete, Esc, Tab,
+F-keys, the ⌘/Ctrl chords with their modifiers, and key repeat (`apps/figcraft-ios/src/gc_keyboard.rs` and
+`hw_keys.rs`; host-tested, and a hardware ⌘Z is asserted to resolve to `edit.undo` in FigCraft's own keymap).
+Not yet verified on a device. Known gap: ⌘/Option+Backspace (delete word or line) is still the plain Backspace
+UIKit types.
+
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-03 | minor | iPadOS hardware keyboard: the runner reads the keyboard through GameController and injects the keys iPadOS withholds from winit (Enter, arrows, Esc, Home/End, Page Up/Down, Delete, Tab, F-keys, ⌘/Ctrl chords, modifiers, key repeat), so shortcuts work with a Folio attached. Host-tested, not yet run on a device |
 | 2026-11-06 | patch | M8, #1906: under Wayland (seen on GNOME and KDE Plasma) a minimised FigCraft window still reports itself visible and the compositor stops asking it to draw, so every control or attached-MCP request waited for a frame and timed out after 60 s ("it was not applied"), though eframe kept running the app's logic. `control::background` now treats a window that drew no frame for `NOT_DRAWING_AFTER` (0.2 s) while a request waited for it as hidden: state-only requests are answered from the logic passes (0.54 s each, measured on GNOME Wayland; they took 13.7 s or timed out before), the wait starts again when the window draws, and screenshots and `ui.input` still wait for a frame. Test: `idle_tests::a_window_that_stopped_drawing_answers_from_its_logic_passes` |
 | 2026-10-31 | minor | M1, #492: Web row: the browser pastes images copied in other apps, read from the paste event under the same limits as the desktop. Numbers unchanged. |
 | 2026-10-30 | minor | M8: text reads only the fallback fonts it draws with. Each fallback family reads the face nearest a run's style, not all of them (Noto Sans CJK is seven files of 16–20 MB); families naming the faces of one file share its bytes; and the faces are worked out once per style until fonts change, not for every text laid out. First text laid out on a Linux machine with Noto Sans CJK, DejaVu Sans and Inter: 41 files (265 MiB, kept in memory) and 41 faces parsed → 3 files (20 MiB) and 4 faces; fallback lookups per text laid out ~45 µs → 0.2 µs. Tests: `fontdb_fallback_tests`. Numbers unchanged |
@@ -72,3 +91,4 @@ Nothing has been timed against Figma on the same document (needs `.fig` import).
 | 2026-10-11 | minor | Several windows (gap 18): File ▸ New window, a tab's Open in new window or a tab dragged off the tab strip opens files in another window with its own tabs, panels and canvas, sharing the files, preferences, libraries and clipboard; each window draws only when it needs to (idle: ~0% CPU), closing one closes its files after asking about unsaved changes (the main window too, which takes over another window instead of quitting; the last window quits), and the control channel and MCP open, list, focus and capture windows (`window.new`, `window.list`, `window.focus`, `window` on any request); the screen-reader tree covers the main window only (eframe 0.36), so with a screen reader running files stay tabs; one window in the browser. Hardware 55% → 60%, 13–27 h → 10–21 h; gap 18 6–12 h → 4–8 h (P3 on screen left); feature breadth (~79%) and ready for real work (~47%) unchanged at this rounding; full parity ~363–697 h → ~360–691 h |
 | 2026-10-11 | minor | Stretch and scatter brushes and pen pressure landed (gap 9): eight brushes drawn in code (four stretched along the path, four scattered with spacing, size, rotation and scatter jitter from a seed) in the stroke settings, drawn everywhere strokes are and flattened by outline stroke; the Pencil records pen pressure as the stroke's width profile (Windows pens, browser styluses; macOS and Linux tablets report none) and can draw with a brush; Figma Draw extras breadth 45% → 65%, ready 30% → 45%, 10–18 h → 5–9 h; Strokes 2–4 h → 1–3 h; Hardware 50% → 55%, 15–30 h → 13–27 h; feature breadth (~79%) and ready for real work (~47%) unchanged at this rounding; full parity ~380–725 h → ~375–715 h |
 | 2026-10-10 | major | Created from the 2026-10-10 re-measure |
+| 2026-10-13 | minor | iPadOS fork section: simulator launch and home screen only; everything else listed as not demonstrated |

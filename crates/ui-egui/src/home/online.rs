@@ -265,7 +265,7 @@ fn team_section(app: &mut FigApp, ui: &mut Ui, t: &Tokens, team: &Team) {
 }
 
 /// What a team row says after the file's name.
-fn team_detail(f: &TeamFile) -> String {
+pub(crate) fn team_detail(f: &TeamFile) -> String {
     let date = utc_date(f.updated);
     let day = date.get(..10).unwrap_or(&date);
     match f.people {
@@ -282,7 +282,7 @@ fn open_team(app: &mut FigApp, server: &str, f: &TeamFile) {
 }
 
 /// One file of the team list: a click joins it; its menu copies its links.
-fn team_row(app: &mut FigApp, ui: &mut Ui, t: &Tokens, server: &str, web: &str, f: &TeamFile) {
+pub(crate) fn team_row(app: &mut FigApp, ui: &mut Ui, t: &Tokens, server: &str, web: &str, f: &TeamFile) {
     let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW), Sense::click());
     let more = Rect::from_center_size(pos2(r.max.x - 18.0, r.center().y), vec2(24.0, 24.0));
     let details = team_detail(f);

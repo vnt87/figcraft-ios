@@ -94,16 +94,13 @@ fn listed(web: String, files: Vec<figcraft_collab::message::TeamFile>) -> TeamLi
 }
 
 impl Session {
-    /// Ask the server in Preferences for its team list (none asked when online sharing is off,
-    /// without the network, or of the public server FigCraft ships with: it keeps none).
-    pub(crate) fn team_refresh(&mut self) -> Result<()> {
-        let server = plain_server(&self.prefs.publish_server);
-        let public = option_env!("FIGCRAFT_DEFAULT_SERVER").is_none() && same_server(&server, DEFAULT_SERVER);
-        if server.is_empty() || public || self.live.link().is_none() || crate::file_access::network_refused().is_some() {
-            self.live.team = None;
-            return Ok(());
+    /// Ask `server` for its team list: `None` when no one can be asked (without the network or a
+    /// link to it, or the server is empty).
+    fn ask_team(&mut self, server: &str) -> Result<Option<Team>> {
+        if server.is_empty() || self.live.link().is_none() || crate::file_access::network_refused().is_some() {
+            return Ok(None);
         }
-        let req = NetRequest::Hosting { server: server.clone(), file: String::new(), owner: String::new(), req: Some(Admin::Team) };
+        let req = NetRequest::Hosting { server: server.to_string(), file: String::new(), owner: String::new(), req: Some(Admin::Team) };
         let list = match self.net(req)?.0 {
             NetReply::Hosting(Ok((_, Some(AdminReply::Team { web, files })))) => listed(web, files),
             // No team list there; a server older than team lists can't read the question.
@@ -112,8 +109,32 @@ impl Session {
             NetReply::Hosting(Err(why)) => TeamList::Offline(why),
             _ => TeamList::None,
         };
-        self.live.team = Some(Team { server, list });
+        Ok(Some(Team { server: server.to_string(), list }))
+    }
+
+    /// Ask the server in Preferences for its team list (none asked when online sharing is off,
+    /// without the network, or of the public server FigCraft ships with: it keeps none).
+    pub(crate) fn team_refresh(&mut self) -> Result<()> {
+        let server = plain_server(&self.prefs.publish_server);
+        let public = option_env!("FIGCRAFT_DEFAULT_SERVER").is_none() && same_server(&server, DEFAULT_SERVER);
+        self.live.team = if public { None } else { self.ask_team(&server)? };
         Ok(())
+    }
+
+    /// Ask the server of workspace `url` for its team list, kept beside the others (the public
+    /// server answers "none" without being asked).
+    pub(crate) fn workspace_refresh(&mut self, url: &str) -> Result<()> {
+        let server = plain_server(url);
+        let public = option_env!("FIGCRAFT_DEFAULT_SERVER").is_none() && same_server(&server, DEFAULT_SERVER);
+        let team = if public { Some(Team { server: server.clone(), list: TeamList::None }) } else { self.ask_team(&server)? };
+        self.live.workspace_teams.retain(|t| !same_server(&t.server, &server));
+        self.live.workspace_teams.extend(team);
+        Ok(())
+    }
+
+    /// The team list of workspace `url` as asked last.
+    pub fn workspace_team(&self, url: &str) -> Option<&Team> {
+        self.live.workspace_teams.iter().find(|t| same_server(&t.server, url))
     }
 
     /// The team list of the server in Preferences, as asked last: `None` when it wasn't asked (or
@@ -124,26 +145,30 @@ impl Session {
 
     /// The team list as `collab.files` gives it.
     pub(crate) fn team_json(&self) -> Value {
-        let Some(t) = self.team() else { return Value::Null };
-        let (state, reason, web, files) = match &t.list {
-            TeamList::Files { web, files } => ("listed", None, Some(web.as_str()).filter(|w| !w.is_empty()), files.as_slice()),
-            TeamList::None => ("none", None, None, &[][..]),
-            TeamList::Offline(why) => ("offline", Some(why.as_str()), None, &[][..]),
-        };
-        let files: Vec<Value> = files
-            .iter()
-            .map(|f| {
-                json!({
-                    "file": f.file,
-                    "name": f.name,
-                    "updated": f.updated,
-                    "people": f.people,
-                    "access": f.access.id(),
-                    "link": team_link(&t.server, &f.file),
-                    "webLink": web.map(|w| web_link(w, &t.server, &f.file)),
-                })
-            })
-            .collect();
-        json!({"server": t.server, "host": server_host(&t.server), "state": state, "reason": reason, "web": web, "files": files})
+        self.team().map_or(Value::Null, team_value)
     }
+}
+
+/// A team list as the commands give it.
+pub(crate) fn team_value(t: &Team) -> Value {
+    let (state, reason, web, files) = match &t.list {
+        TeamList::Files { web, files } => ("listed", None, Some(web.as_str()).filter(|w| !w.is_empty()), files.as_slice()),
+        TeamList::None => ("none", None, None, &[][..]),
+        TeamList::Offline(why) => ("offline", Some(why.as_str()), None, &[][..]),
+    };
+    let files: Vec<Value> = files
+        .iter()
+        .map(|f| {
+            json!({
+                "file": f.file,
+                "name": f.name,
+                "updated": f.updated,
+                "people": f.people,
+                "access": f.access.id(),
+                "link": team_link(&t.server, &f.file),
+                "webLink": web.map(|w| web_link(w, &t.server, &f.file)),
+            })
+        })
+        .collect();
+    json!({"server": t.server, "host": server_host(&t.server), "state": state, "reason": reason, "web": web, "files": files})
 }

@@ -20,6 +20,7 @@ mod outline;
 mod overlays;
 mod render;
 mod rulers;
+pub mod touch;
 
 #[cfg(test)]
 use builder::clean_poly;
@@ -69,6 +70,10 @@ pub struct CanvasState {
     dragging: bool,
     space_pan: bool,
     middle_pan: Option<(Pos2, f64, f64)>,
+    /// A finger down on the canvas that taps or pans rather than driving the tool ([`touch`]).
+    finger: Option<touch::Finger>,
+    /// A gesture that began with two fingers is still down: the pointer is left alone.
+    multi_lock: bool,
     /// The zoom tool (Z held): zooming out (Alt) or in, and where its drag started.
     zoom_tool: Option<bool>,
     zoom_drag: Option<Pos2>,
@@ -106,6 +111,8 @@ impl Default for CanvasState {
             dragging: false,
             space_pan: false,
             middle_pan: None,
+            finger: None,
+            multi_lock: false,
             cursor: None,
             zoom_tool: None,
             zoom_drag: None,
@@ -403,6 +410,8 @@ mod panel_nodes_tests;
 #[cfg(test)]
 mod selection_cache_tests;
 
+#[cfg(test)]
+mod touch_tests;
 #[cfg(test)]
 mod wheel_zoom_tests;
 

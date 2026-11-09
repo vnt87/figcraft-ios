@@ -548,6 +548,13 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
 - **Estimate:** 30–60 h with openly licensed local models. **Owner decision needed.**
 
 ### 20. Mobile apps
+- **Landed (2026-11-09, iPad):** the iPad app works by touch and Pencil as a drawing app does. A
+  finger taps and pans (a press on something the Move or Scale tool can grab still drives the
+  tool), two fingers pan and pinch, and a second finger drops the half-drawn shape or drag the
+  first one began. The Apple Pencil is told from a finger and acts with the active tool, and its
+  hover above the screen reaches the canvas as a pointer move (layer highlight, tool previews).
+  The bottom bar clears the home indicator and carries Undo and Redo, on the iPad only. Pencil
+  hover needs a physical iPad to check.
 - **Missing:** Figma's iOS and Android apps view and comment on files and mirror prototypes.
   FigCraft's web build runs in mobile browsers but is not designed for touch.
 - **Estimate:** 20–40 h for a touch-first viewer and mirror.

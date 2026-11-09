@@ -827,6 +827,10 @@ fn draw(p: &P, icon: Icon) {
             let meridian: Vec<(f32, f32)> = arc_pts(0.0, 0.0, 1.0, 0.0, TAU).map(|(x, y)| (8.0 + 2.4 * x, 8.0 + 5.5 * y)).collect();
             p.path(&meridian, true);
         }
+        Workspace => {
+            p.rect(2.5, 5.5, 10.5, 13.5, 1.5);
+            p.path(&[(5.5, 5.5), (5.5, 2.5), (13.5, 2.5), (13.5, 10.5), (10.5, 10.5)], false);
+        }
         LiveShared => {
             p.dot(8.0, 8.0, 1.6);
             for r in [3.6, 6.0] {

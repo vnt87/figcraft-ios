@@ -38,7 +38,7 @@ pub(super) fn palette(app: &mut FigApp, ctx: &egui::Context) {
     // Same centre and width as the toolbar pill (it centres on the canvas, not the window),
     // floating 8 px above it. Fixed size: switching tabs never resizes the panel.
     let bar_w = crate::toolbar::bar_width(app);
-    let bar = crate::toolbar::pill_rect(app.canvas.rect, bar_w);
+    let bar = crate::toolbar::pill_rect(crate::toolbar::dock(app), bar_w);
     let area = Rect::from_min_max(pos2(bar.min.x, bar.min.y - 8.0 - (PALETTE_H + 16.0)), pos2(bar.max.x, bar.min.y - 8.0));
     let mut run: Option<String> = None;
     let mut close = false;

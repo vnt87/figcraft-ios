@@ -570,9 +570,15 @@ fn the_server_preference_resets_and_turns_online_sharing_off() {
     let (mut h, script) = harness();
     h.app.ui.preferences = true;
     let shapes = h.frames(2);
-    assert!(has_text(&shapes, "Server for online sharing") && has_text(&shapes, "Reset"));
-    click(&mut h, &shapes, "Reset");
+    // A server that isn't a workspace shows by its host; a workspace by its name; the built-in one by its own.
+    assert!(has_text(&shapes, "Server for online sharing") && has_text(&shapes, "share.example"));
+    h.app.session.execute("workspace.join", &json!({"url": "wss://team.example/", "name": "Design team"})).unwrap();
+    h.app.session.execute("pref.publishServer", &json!({"url": "wss://team.example/"})).unwrap();
+    let shapes = h.frames(2);
+    assert!(has_text(&shapes, "Design team") && !has_text(&shapes, "FigCraft server"));
+    h.app.session.execute("pref.publishServer", &json!({})).unwrap();
     assert_eq!(h.app.session.prefs.publish_server, DEFAULT_SERVER);
+    assert!(has_text(&h.frames(2), "FigCraft server"));
     // Off: Preferences say what that means, and the popover offers the local network only.
     h.app.session.execute("pref.publishServer", &json!({"url": ""})).unwrap();
     let shapes = h.frames(2);

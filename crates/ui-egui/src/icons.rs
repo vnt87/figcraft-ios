@@ -205,6 +205,8 @@ icons! {
     GamutWarning,
     /// Online: a globe (a circle with its equator and a meridian).
     Online,
+    /// A workspace: a window with a second one stacked behind it.
+    Workspace,
     /// In a live session others get into: a point sending waves to both sides.
     LiveShared,
     /// Disconnected from a live session: the point and its waves, struck through.
