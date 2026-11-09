@@ -68,6 +68,11 @@ impl eframe::App for IosApp {
         if let Some(wait) = self.keys.next_wake(now) {
             ctx.request_repaint_after(std::time::Duration::from_secs_f64(wait.max(0.001)));
         }
+        // The Pencil: its hover moves the pointer, and a touching Pencil is told from a finger.
+        crate::pencil_input::with(|pencil| {
+            raw_input.events.extend(pencil.events());
+            figcraft_ui_egui::canvas::touch::mark_pencil(ctx, pencil.is_down());
+        });
         crate::safe_area::apply(raw_input);
     }
 

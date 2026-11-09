@@ -18,6 +18,11 @@ mod hw_keys;
 #[cfg(any(target_os = "ios", test))]
 mod logging;
 #[cfg(target_os = "ios")]
+#[allow(unsafe_code)]
+mod pencil;
+#[cfg(any(target_os = "ios", test))]
+mod pencil_input;
+#[cfg(target_os = "ios")]
 mod safe_area;
 #[cfg(target_os = "ios")]
 #[allow(unsafe_code)]
@@ -87,6 +92,10 @@ pub fn run() -> Result<(), String> {
                 // Enter, arrows, Escape, F-keys and every ⌘ chord: winit's UIKit view forwards only
                 // text and Backspace, so the hardware keyboard is read separately and injected.
                 gc_keyboard::install(cc.egui_ctx.clone());
+                // The Pencil: told apart from a finger, and its hover above the screen.
+                if let Err(error) = pencil::install(cc) {
+                    log::warn!("Apple Pencil recognisers unavailable: {error}");
+                }
                 // Hide the status bar through the safe platform API so it cannot overlay egui's menu.
                 use winit::platform::ios::WindowExtIOS;
                 if let Some(window) = cc.winit_window() {
