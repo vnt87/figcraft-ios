@@ -201,6 +201,20 @@ someone in, so keep it off on a server open to anyone.
 - **Upgrade note.** An app older than the team list shows no list and can't open its links (it
   names no token); a server older than it answers that it has no team list.
 
+### Workspaces
+
+The app lists servers as **workspaces** (Home ▸ Workspaces, under Templates). A workspace is a
+server's address with a name you give it on your computer; opening one shows the server's team list
+as above, so a server with `team_files` off lists nothing there. Join one with **+** beside the
+heading (paste `wss://…`, or the `https://…` address of the server's page), rename it, or leave it
+(right-click or long-press its row): leaving only forgets it on your computer. There are no accounts
+and the address carries no key, so nothing secret is kept; the list is saved with the preferences
+(in the browser build, in local storage). The server set in **Preferences ▸ Server for online
+sharing** is the first workspace the first time the list is read (not the public server FigCraft
+ships with), and that preference is now a pick among the FigCraft server, your workspaces and off.
+Scripts use `workspace.list`, `workspace.join`, `workspace.rename`, `workspace.leave` and
+`workspace.files {url, refresh: true}`.
+
 ## Joining
 
 A [join code](#sharing-with-a-join-code) is the short way in. Share links look like the desktop
