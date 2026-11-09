@@ -135,9 +135,10 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
     main_toolbar(app, ui, canvas, &t, board);
 }
 
-/// How far the iPad's bottom bar sits above where it sits elsewhere: a finger lands on the bar
-/// without reaching the home indicator's swipe zone below it (12 pt of margin becomes 28).
-pub(crate) const IPAD_LIFT: f32 = 16.0;
+/// How far the iPad's bottom bar sits above where it sits elsewhere, so a finger on it stays out of
+/// the home indicator's swipe zone: 12 pt of margin becomes 56. (On a real iPad the canvas runs to
+/// the bottom of the screen, 20 pt past the safe area, so this is measured from the screen's edge.)
+pub(crate) const IPAD_LIFT: f32 = 44.0;
 
 /// The canvas the toolbar docks to: the canvas itself, or on an iPad the canvas less [`IPAD_LIFT`]
 /// at the bottom, so the bar (and the help button and Actions palette placed from it) float higher.

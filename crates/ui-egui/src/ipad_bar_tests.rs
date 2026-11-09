@@ -59,7 +59,7 @@ fn only_the_ipad_bar_is_lifted_and_wider() {
     assert_eq!(flat.app.canvas.rect, ipad.app.canvas.rect);
     let (f, i) = (flat.pill(), ipad.pill());
     assert!((f.max.y - flat.app.canvas.rect.max.y + 12.0).abs() < 0.01, "elsewhere 12 pt from the bottom: {f:?}");
-    assert!((i.max.y - ipad.app.canvas.rect.max.y + 12.0 + IPAD_LIFT).abs() < 0.01, "on an iPad 28 pt: {i:?}");
+    assert!((i.max.y - ipad.app.canvas.rect.max.y + 12.0 + IPAD_LIFT).abs() < 0.01, "on an iPad 56 pt: {i:?}");
     assert!((i.width() - f.width() - history_width(&ipad.app)).abs() < 0.01, "room for Undo and Redo: {f:?} vs {i:?}");
     assert_eq!(history_width(&flat.app), 0.0);
 }
