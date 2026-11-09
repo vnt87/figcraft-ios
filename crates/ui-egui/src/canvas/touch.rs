@@ -42,6 +42,27 @@ pub fn pencil_down(ctx: &Context) -> bool {
     ctx.data(|d| d.get_temp::<bool>(pencil_id())).unwrap_or(false)
 }
 
+fn hover_id() -> Id {
+    Id::unique("figcraft.touch.pencil_hover")
+}
+
+/// Host call: the Pencil hovers above the screen at `Some(height)` (0 at the glass, 1 at the far end
+/// of the range the hardware reports), or does not hover (`None`).
+pub fn mark_hover(ctx: &Context, height: Option<f32>) {
+    ctx.data_mut(|d| {
+        if let Some(h) = height {
+            d.insert_temp(hover_id(), h);
+        } else {
+            d.remove_temp::<f32>(hover_id());
+        }
+    });
+}
+
+/// How high the Pencil hovers (0..=1), if it does.
+pub fn pencil_hover(ctx: &Context) -> Option<f32> {
+    ctx.data(|d| d.get_temp::<f32>(hover_id())).filter(|h| h.is_finite()).map(|h| h.clamp(0.0, 1.0))
+}
+
 /// Whether a press at `pos` is the tool's to take: the Move or Scale tool over a layer, a handle
 /// of the selection, or an edit in progress; the Hand tool, which pans by itself.
 pub(super) fn tool_takes(app: &FigApp, pos: Pos2) -> bool {

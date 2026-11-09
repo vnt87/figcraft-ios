@@ -175,3 +175,42 @@ fn two_fingers_pan_with_the_pointer_nowhere_over_the_canvas() {
     }
     assert!(t.view().0 < before.0 - 5.0, "panned: {before:?} → {:?}", t.view());
 }
+
+#[test]
+fn a_hovering_pencil_is_told_to_the_canvas_with_its_height_and_clamped() {
+    let ctx = egui::Context::default();
+    assert_eq!(super::touch::pencil_hover(&ctx), None);
+    super::touch::mark_hover(&ctx, Some(0.25));
+    assert_eq!(super::touch::pencil_hover(&ctx), Some(0.25));
+    super::touch::mark_hover(&ctx, Some(9.0));
+    assert_eq!(super::touch::pencil_hover(&ctx), Some(1.0));
+    super::touch::mark_hover(&ctx, Some(f32::NAN));
+    assert_eq!(super::touch::pencil_hover(&ctx), None);
+    super::touch::mark_hover(&ctx, None);
+    assert_eq!(super::touch::pencil_hover(&ctx), None);
+}
+
+/// Circles in what a frame draws: the reticle is a ring and dot, each with its halo.
+fn circles(t: &mut Touch, events: Vec<Event>) -> usize {
+    t.time += 1.0 / 60.0;
+    let input =
+        RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))), time: Some(t.time), events, ..Default::default() };
+    let app = &mut t.app;
+    let out = t.ctx.run_ui(input, |ui| app.ui(ui));
+    out.shapes.iter().filter(|s| matches!(s.shape, egui::Shape::Circle(_))).count()
+}
+
+#[test]
+fn the_reticle_is_drawn_over_the_canvas_while_the_pencil_hovers_and_follows_the_preference() {
+    let mut t = Touch::new();
+    let at = t.centre();
+    let none = circles(&mut t, vec![Event::PointerMoved(at)]);
+    super::touch::mark_hover(&t.ctx, Some(0.5));
+    let shown = circles(&mut t, vec![Event::PointerMoved(at + vec2(1.0, 0.0))]);
+    assert_eq!(shown, none + 4, "ring and dot, each with a halo");
+    t.app.session.prefs.pencil_reticle = false;
+    assert_eq!(circles(&mut t, vec![Event::PointerMoved(at + vec2(2.0, 0.0))]), none, "off in Preferences");
+    t.app.session.prefs.pencil_reticle = true;
+    super::touch::mark_hover(&t.ctx, None);
+    assert_eq!(circles(&mut t, vec![Event::PointerMoved(at + vec2(3.0, 0.0))]), none, "the hover ended");
+}

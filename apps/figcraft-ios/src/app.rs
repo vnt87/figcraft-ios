@@ -72,6 +72,7 @@ impl eframe::App for IosApp {
         crate::pencil_input::with(|pencil| {
             raw_input.events.extend(pencil.events());
             figcraft_ui_egui::canvas::touch::mark_pencil(ctx, pencil.is_down());
+            figcraft_ui_egui::canvas::touch::mark_hover(ctx, pencil.hover_height());
         });
         crate::safe_area::apply(raw_input);
     }

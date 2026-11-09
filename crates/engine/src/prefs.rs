@@ -31,6 +31,9 @@ pub struct Prefs {
     pub keep_tool: bool,
     pub rename_duplicates: bool,
     pub highlight_on_hover: bool,
+    /// A ring and dot float over the canvas where the Apple Pencil hovers (iPad hardware that
+    /// reports hover; nothing else shows it).
+    pub pencil_reticle: bool,
     pub number_keys_opacity: bool,
     pub show_dimensions: bool,
     /// A mouse wheel zooms the canvas about the pointer, and Cmd/Ctrl+wheel scrolls it (off: the
@@ -139,6 +142,7 @@ impl Default for Prefs {
             keep_tool: false,
             rename_duplicates: false,
             highlight_on_hover: true,
+            pencil_reticle: true,
             number_keys_opacity: true,
             show_dimensions: true,
             scroll_wheel_zoom: false,

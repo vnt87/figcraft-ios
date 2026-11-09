@@ -241,6 +241,7 @@ pub fn show(app: &mut FigApp, ctx: &Context) {
             for (label, val, cmd) in [
                 (tr("Keep tool selected after use"), prefs.keep_tool, "pref.keepTool"),
                 (tr("Highlight layers on hover"), prefs.highlight_on_hover, "pref.highlightHover"),
+                (tr("Show a reticle where the Apple Pencil hovers"), prefs.pencil_reticle, "pref.pencilReticle"),
                 (tr("Rename duplicated layers"), prefs.rename_duplicates, "pref.renameDuplicates"),
                 (tr("Show dimensions on objects"), prefs.show_dimensions, "pref.showDimensions"),
                 (tr("Use number keys for opacity"), prefs.number_keys_opacity, "pref.numberKeysOpacity"),
