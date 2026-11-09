@@ -93,3 +93,23 @@ pub(super) fn second_finger(app: &mut FigApp, ctx: &Context) -> bool {
     }
     app.canvas.multi_lock
 }
+
+/// Two or more fingers on the canvas: the view pans with their centre and zooms with their spread,
+/// both in the same frame (fingers never keep their spacing exactly, so a pinch's small zoom must
+/// not stop the pan). The zoom is about where the fingers' centre was, then the pan follows it.
+pub(super) fn gesture(app: &mut FigApp, m: &egui::MultiTouchInfo) {
+    if !(m.center_pos.is_finite() && m.translation_delta.is_finite() && m.zoom_delta.is_finite() && m.zoom_delta > 0.0) {
+        return;
+    }
+    let before = app.to_page(m.center_pos - m.translation_delta);
+    if let Ok(ds) = app.session.ds_mut() {
+        if (m.zoom_delta - 1.0).abs() > 1e-4 {
+            let z = ds.view.zoom * f64::from(m.zoom_delta);
+            ds.view.set_zoom_at(z, (before.x, before.y));
+        }
+        if m.translation_delta != egui::Vec2::ZERO {
+            ds.view.scroll(f64::from(m.translation_delta.x), f64::from(m.translation_delta.y), false);
+        }
+        ds.revision += 1;
+    }
+}

@@ -136,3 +136,42 @@ fn a_second_finger_drops_the_gesture_the_first_began() {
     t.up(1, c + vec2(200.0, 90.0));
     assert_eq!(t.nodes(), nodes);
 }
+
+/// Two fingers a little apart, at `at` and `at + (gap, 0)`.
+fn two(t: &mut Touch, a: Pos2, b: Pos2, phase_a: TouchPhase, phase_b: TouchPhase) {
+    t.frame(vec![Event::PointerMoved(a), Touch::touch(1, phase_a, a), Touch::touch(2, phase_b, b)]);
+}
+
+#[test]
+fn two_fingers_pan_even_while_their_spacing_wobbles() {
+    let mut t = Touch::new();
+    let c = t.centre();
+    let before = t.view();
+    let (mut a, mut b) = (c - vec2(60.0, 0.0), c + vec2(60.0, 0.0));
+    two(&mut t, a, b, TouchPhase::Start, TouchPhase::Start);
+    // Both fingers move 12 pt right and down each frame, the second a hair further: a pinch of a
+    // fraction of a percent every frame, as real fingers make.
+    for i in 0..8 {
+        a += vec2(12.0, 8.0);
+        b += vec2(12.2 + i as f32 * 0.01, 8.0);
+        two(&mut t, a, b, TouchPhase::Move, TouchPhase::Move);
+    }
+    let after = t.view();
+    assert!(after.0 < before.0 - 5.0 && after.1 < before.1 - 3.0, "the view followed the fingers: {before:?} → {after:?}");
+}
+
+#[test]
+fn two_fingers_pan_with_the_pointer_nowhere_over_the_canvas() {
+    let mut t = Touch::new();
+    let c = t.centre();
+    let before = t.view();
+    let (mut a, mut b) = (c - vec2(60.0, 0.0), c + vec2(60.0, 0.0));
+    two(&mut t, a, b, TouchPhase::Start, TouchPhase::Start);
+    for _ in 0..6 {
+        a += vec2(15.0, 0.0);
+        b += vec2(15.0, 0.0);
+        // No pointer position in these frames: only the touches say where the fingers are.
+        t.frame(vec![Touch::touch(1, TouchPhase::Move, a), Touch::touch(2, TouchPhase::Move, b), Event::PointerGone]);
+    }
+    assert!(t.view().0 < before.0 - 5.0, "panned: {before:?} → {:?}", t.view());
+}

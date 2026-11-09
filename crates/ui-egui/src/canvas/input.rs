@@ -245,12 +245,15 @@ pub(super) fn input(app: &mut FigApp, ui: &mut Ui, resp: &egui::Response) -> boo
     }
     let ctx = ui.ctx().clone();
     // Two fingers pan as well as pinch (a touch screen has no scroll wheel).
-    let (mods, pan, zoom_delta, hover_pos, space) = ctx.input(|i| {
-        let pan = i.multi_touch().map_or(egui::Vec2::ZERO, |m| m.translation_delta);
-        (i.modifiers, pan, i.zoom_delta(), i.pointer.hover_pos(), i.key_down(egui::Key::Space))
-    });
+    let (mods, multi, zoom_delta, hover_pos, space) =
+        ctx.input(|i| (i.modifiers, i.multi_touch(), i.zoom_delta(), i.pointer.hover_pos(), i.key_down(egui::Key::Space)));
     let (wheel, zoom_delta) = wheel_zoom(app, &ctx, zoom_delta, mods.shift);
-    let scroll = wheel + pan;
+    // Fingers pan and zoom together, wherever the pointer is taken to be ([`super::touch::gesture`]).
+    let touching = multi.filter(|m| app.canvas.rect.contains(m.center_pos));
+    if let Some(m) = &touching {
+        super::touch::gesture(app, m);
+    }
+    let scroll = wheel;
     let editing_text = app.session.ds().map(|d| d.text_edit.is_some()).unwrap_or(false);
     let typing_elsewhere = crate::a11y::field_focused(&ctx);
     app.canvas.space_pan = space && !editing_text && !typing_elsewhere;
@@ -290,7 +293,7 @@ pub(super) fn input(app: &mut FigApp, ui: &mut Ui, resp: &egui::Response) -> boo
     }
     // Zoom (pinch, Cmd/Ctrl+scroll; a plain mouse wheel with Scroll wheel zoom) about the pointer;
     // other scrolls pan.
-    if resp.hovered() {
+    if resp.hovered() && multi.is_none() {
         if (zoom_delta - 1.0).abs() > 1e-4 {
             let anchor = app.to_page(pos);
             if let Ok(ds) = app.session.ds_mut() {
