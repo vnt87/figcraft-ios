@@ -5,6 +5,7 @@
 //! so the canvas draws with it while a finger pans ([`figcraft_ui_egui::canvas::touch`]).
 //!
 //! This is free of UIKit types so it is tested on the host.
+#[cfg(target_os = "ios")]
 use std::sync::Mutex;
 
 use eframe::egui::{Event, Pos2};
@@ -71,8 +72,10 @@ impl Pencil {
     }
 }
 
+#[cfg(target_os = "ios")]
 static SHARED: Mutex<Pencil> = Mutex::new(Pencil { down: false, hover: None, moved: false, gone: false });
 
+#[cfg(target_os = "ios")]
 /// Run `f` on the Pencil state the UIKit callbacks and the frame loop share.
 pub fn with<R>(f: impl FnOnce(&mut Pencil) -> R) -> R {
     match SHARED.lock() {

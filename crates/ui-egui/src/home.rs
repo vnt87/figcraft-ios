@@ -17,6 +17,7 @@ use crate::theme::{ACCENT, Tokens, regular, semibold};
 use crate::widgets;
 pub mod home_recents;
 pub mod online;
+pub mod workspaces;
 
 /// The section the home screen shows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -25,6 +26,8 @@ pub enum Section {
     Recents,
     Online,
     Templates,
+    /// A workspace's files, or the form that joins one ([`workspaces`]).
+    Workspaces,
 }
 
 impl Section {
@@ -41,11 +44,12 @@ impl Section {
             Section::Recents => "recents",
             Section::Online => "online",
             Section::Templates => "templates",
+            Section::Workspaces => "workspaces",
         }
     }
 
     pub fn parse(id: &str) -> Option<Section> {
-        Section::ALL.into_iter().map(|(section, ..)| section).find(|section| section.id() == id)
+        Section::ALL.into_iter().map(|(section, ..)| section).chain([Section::Workspaces]).find(|section| section.id() == id)
     }
 }
 
@@ -60,9 +64,11 @@ pub struct Home {
     pub kind: Option<Kind>,
     /// The recent files: what is known about each, and the selection.
     pub recents: crate::home_recents::Recents,
+    /// The Workspaces section: which workspace is open, the join form.
+    pub workspaces: workspaces::WorkspacesUi,
 }
 
-const SIDEBAR: f32 = 240.0;
+pub(crate) const SIDEBAR: f32 = 240.0;
 const CARD_W: f32 = 248.0;
 const THUMB_H: f32 = 148.0;
 const CARD_H: f32 = THUMB_H + 86.0;
@@ -154,6 +160,12 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
             opened_join(app);
             return;
         }
+        if app.ui.home_view.file_query.trim().is_empty() && app.ui.home_view.section == Section::Workspaces {
+            let area = Rect::from_min_max(pos2(left.max.x + 40.0, rect.min.y + 24.0), rect.max - vec2(40.0, 24.0));
+            workspaces::section(app, ui, area, &t);
+            opened_join(app);
+            return;
+        }
         let main = Rect::from_min_max(pos2(left.max.x, rect.min.y), rect.max);
         ui.scope_builder(egui::UiBuilder::new().max_rect(main), |ui| {
             egui::ScrollArea::vertical().id_salt("home").auto_shrink([false, false]).show(ui, |ui| {
@@ -229,6 +241,7 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
         }
         y += 34.0;
     }
+    workspaces::sidebar(app, ui, t, left, y + 8.0);
 }
 
 fn file_matches(name: &str, location: &str, query: &str) -> bool {

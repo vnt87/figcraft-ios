@@ -146,7 +146,7 @@ pub fn install(cc: &eframe::CreationContext<'_>) -> Result<(), String> {
     view.addGestureRecognizer(&hover);
     KEPT.with(|kept| {
         if let Ok(mut kept) = kept.try_borrow_mut() {
-            kept.push(Retained::into_super(Retained::into_super(target)).into());
+            kept.push(Retained::into_super(Retained::into_super(target)));
             kept.push(Retained::into_super(Retained::into_super(observer)).into());
         }
     });

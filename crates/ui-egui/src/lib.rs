@@ -48,6 +48,8 @@ mod board_ui_tests;
 mod ipad_bar_tests;
 #[cfg(test)]
 mod theme_startup_tests;
+#[cfg(test)]
+mod workspaces_ui_tests;
 
 #[cfg(test)]
 mod a11y_tests;
