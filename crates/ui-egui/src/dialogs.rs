@@ -283,16 +283,9 @@ pub fn show(app: &mut FigApp, ctx: &Context) {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.label(tr("Server for online sharing"));
-                // Where Share ▸ Online keeps files and join codes are asked; no key here
-                // (preferences are saved as text).
-                let name = tr("Server for online sharing");
-                if let Some(url) = crate::widgets::text_field_named(ui, egui::Id::unique("pref_publish_server"), &prefs.publish_server, 220.0, name) {
-                    app.run("pref.publishServer", json!({"url": url}));
-                }
-                let usual = prefs.publish_server == figcraft_engine::live::DEFAULT_SERVER;
-                if crate::widgets::button(ui, tr("Reset"), false, !usual).on_hover_text(tr("Back to the FigCraft server")).clicked() {
-                    app.run("pref.publishServer", json!({}));
-                }
+                // Where Share ▸ Online keeps files and join codes are asked: the FigCraft server or
+                // one of your workspaces (joined on the home screen; their addresses carry no key).
+                publish_server_picker(app, ui, &prefs);
             });
             if prefs.publish_server.is_empty() {
                 crate::widgets::label(ui, tr("Online sharing is off: files are shared on the local network only."), t.text_secondary);
@@ -479,5 +472,59 @@ fn interface_size(app: &mut FigApp, ui: &mut egui::Ui, chosen: f64) {
             &[("size", &crate::ui_scale::percent(chosen as f32)), ("drawn", &crate::ui_scale::percent(app.ui.ui_scale.zoom))],
         );
         crate::widgets::label(ui, &note, t.text_secondary);
+    }
+}
+
+/// The Preferences dropdown that picks the server online sharing uses: the FigCraft server, a joined
+/// workspace, or off, with a way to join another workspace.
+fn publish_server_picker(app: &mut FigApp, ui: &mut egui::Ui, prefs: &figcraft_engine::Prefs) {
+    use figcraft_engine::live::DEFAULT_SERVER;
+    use figcraft_engine::online::{same_server, server_host};
+    let built_in = (!DEFAULT_SERVER.is_empty()).then_some(DEFAULT_SERVER);
+    let selected = if prefs.publish_server.is_empty() {
+        tr("Off").to_string()
+    } else if built_in.is_some_and(|d| same_server(&prefs.publish_server, d)) {
+        tr("FigCraft server").to_string()
+    } else {
+        match prefs.workspace_index(&prefs.publish_server).and_then(|i| prefs.workspaces.get(i)) {
+            Some(w) => w.label().to_string(),
+            None => server_host(&prefs.publish_server).to_string(),
+        }
+    };
+    let resp = crate::widgets::dropdown(ui, &selected, 220.0, None);
+    let mut pick: Option<serde_json::Value> = None;
+    let mut join = false;
+    crate::right::menu_popup(&resp).show(|ui| {
+        if built_in.is_some()
+            && crate::right::menu_check(ui, built_in.is_some_and(|d| same_server(&prefs.publish_server, d)), tr("FigCraft server"), "")
+        {
+            pick = Some(json!({}));
+            ui.close();
+        }
+        for w in &prefs.workspaces {
+            if crate::right::menu_check(ui, same_server(&prefs.publish_server, &w.url), w.label(), "") {
+                pick = Some(json!({"url": w.url}));
+                ui.close();
+            }
+        }
+        if crate::right::menu_check(ui, prefs.publish_server.is_empty(), tr("Off"), "") {
+            pick = Some(json!({"url": ""}));
+            ui.close();
+        }
+        if crate::right::menu_item(ui, tr("Join a workspace…"), "") {
+            join = true;
+            ui.close();
+        }
+    });
+    if let Some(params) = pick {
+        app.run("pref.publishServer", params);
+    }
+    if join {
+        let home = &mut app.ui.home_view;
+        home.section = crate::home::Section::Workspaces;
+        home.file_query.clear();
+        home.workspaces.open = None;
+        app.ui.home = true;
+        app.ui.preferences = false;
     }
 }
