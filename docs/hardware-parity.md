@@ -52,7 +52,9 @@ Only what has been demonstrated. On the iPad Air 11-inch (M3) Simulator with iPa
 Debug app builds for Apple Silicon, installs, launches and draws the home screen in portrait inside the safe
 area. File pickers use the async `Services::pick_open`/`pick_save`/`pick_folder` (`DialogFuture`) over UIKit's
 document picker; host tests cover the runner's storage and change tracking, but the picker itself is not yet
-exercised. Nothing has been run on a physical iPad. Not demonstrated or not wired up: opening and saving a file
+exercised. The Apple Pencil's hover reticle (a ring and dot whose ring follows the hover height from
+`UIHoverGestureRecognizer.zOffset`) is implemented but unverified on hardware: its drawing is checked through
+the control channel and the state by host tests. Nothing has been run on a physical iPad. Not demonstrated or not wired up: opening and saving a file
 end to end, touch, Apple Pencil, live sessions, multitasking, landscape, folder pickers
 (cancelled), the system clipboard, opening URLs, crash-recovery copies.
 

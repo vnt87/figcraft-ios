@@ -552,7 +552,10 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
   finger taps and pans (a press on something the Move or Scale tool can grab still drives the
   tool), two fingers pan and pinch, and a second finger drops the half-drawn shape or drag the
   first one began. The Apple Pencil is told from a finger and acts with the active tool, and its
-  hover above the screen reaches the canvas as a pointer move (layer highlight, tool previews).
+  hover above the screen reaches the canvas as a pointer move (layer highlight, tool previews) and
+  shows a reticle: a ring and dot at the tip, the ring closing in as the tip nears the glass
+  (Preferences ▸ Show a reticle where the Apple Pencil hovers, on by default). Unverified on
+  hardware: the reticle is checked through the control channel's `pencilHover` event, not on an iPad.
   The bottom bar clears the home indicator and carries Undo and Redo, on the iPad only. Pencil
   hover needs a physical iPad to check.
 - **Missing:** Figma's iOS and Android apps view and comment on files and mirror prototypes.

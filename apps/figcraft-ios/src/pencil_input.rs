@@ -14,6 +14,8 @@ use eframe::egui::{Event, Pos2};
 pub struct Pencil {
     down: bool,
     hover: Option<Pos2>,
+    /// How high the hovering tip is: 0 at the glass, 1 at the far end of the hardware's range.
+    height: f32,
     /// The hover moved since the last frame.
     moved: bool,
     /// The hover ended since the last frame.
@@ -27,16 +29,25 @@ impl Pencil {
         if down {
             // A touching Pencil is no longer hovering: its touch moves the pointer from here on.
             self.hover = None;
+            self.height = 0.0;
             self.moved = false;
             self.gone = false;
         }
     }
 
     /// The Pencil hovers at `at` (screen points), or no longer hovers (`None`).
+    #[cfg(test)]
     pub fn hover(&mut self, at: Option<Pos2>) {
+        self.hover_at(at, 0.0);
+    }
+
+    /// As [`Pencil::hover`], with how high the tip is (0 at the glass, 1 at the far end of the range;
+    /// out of range is clamped, not a number is 0).
+    pub fn hover_at(&mut self, at: Option<Pos2>, height: f32) {
         match at {
             Some(p) if p.is_finite() && !self.down => {
                 self.hover = Some(p);
+                self.height = if height.is_finite() { height.clamp(0.0, 1.0) } else { 0.0 };
                 self.moved = true;
                 self.gone = false;
             }
@@ -48,6 +59,11 @@ impl Pencil {
                 self.moved = false;
             }
         }
+    }
+
+    /// How high the Pencil hovers (0..=1), if it hovers: the canvas draws its reticle from this.
+    pub fn hover_height(&self) -> Option<f32> {
+        self.hover.map(|_| self.height)
     }
 
     pub fn is_down(&self) -> bool {
@@ -73,7 +89,7 @@ impl Pencil {
 }
 
 #[cfg(target_os = "ios")]
-static SHARED: Mutex<Pencil> = Mutex::new(Pencil { down: false, hover: None, moved: false, gone: false });
+static SHARED: Mutex<Pencil> = Mutex::new(Pencil { down: false, hover: None, height: 0.0, moved: false, gone: false });
 
 #[cfg(target_os = "ios")]
 /// Run `f` on the Pencil state the UIKit callbacks and the frame loop share.
@@ -122,6 +138,27 @@ mod tests {
         p.touch(false);
         assert!(!p.is_down());
         assert!(p.events().is_empty(), "lifting reports nothing: the touch's own end did");
+    }
+
+    #[test]
+    fn the_hover_height_is_clamped_and_gone_when_the_hover_ends_or_the_pencil_touches() {
+        let mut p = Pencil::default();
+        assert_eq!(p.hover_height(), None);
+        p.hover_at(Some(pos2(1.0, 1.0)), 0.4);
+        assert_eq!(p.hover_height(), Some(0.4));
+        p.hover_at(Some(pos2(1.0, 1.0)), 5.0);
+        assert_eq!(p.hover_height(), Some(1.0));
+        p.hover_at(Some(pos2(1.0, 1.0)), -1.0);
+        assert_eq!(p.hover_height(), Some(0.0));
+        p.hover_at(Some(pos2(1.0, 1.0)), f32::NAN);
+        assert_eq!(p.hover_height(), Some(0.0));
+        p.hover_at(Some(pos2(1.0, 1.0)), 0.7);
+        p.touch(true);
+        assert_eq!(p.hover_height(), None, "touching ends the hover");
+        p.touch(false);
+        p.hover_at(Some(pos2(2.0, 2.0)), 0.7);
+        p.hover(None);
+        assert_eq!(p.hover_height(), None, "so does the hover ending");
     }
 
     #[test]

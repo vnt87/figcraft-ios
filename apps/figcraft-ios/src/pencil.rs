@@ -90,6 +90,8 @@ define_class!(
         #[unsafe(method(hover:))]
         fn hover(&self, recogniser: &UIHoverGestureRecognizer) {
             let state = recogniser.state();
+            // `zOffset` is the normalised distance (iOS 16.1+; 0 where the hardware reports none).
+            let height = recogniser.zOffset() as f32;
             let at = if state == UIGestureRecognizerState::Began || state == UIGestureRecognizerState::Changed {
                 recogniser.view().map(|view| {
                     let p = recogniser.locationInView(Some(&view));
@@ -98,7 +100,7 @@ define_class!(
             } else {
                 None
             };
-            pencil_input::with(|p| p.hover(at));
+            pencil_input::with(|p| p.hover_at(at, height));
             wake();
         }
     }

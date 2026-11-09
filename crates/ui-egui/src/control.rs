@@ -1119,8 +1119,14 @@ fn ui_input(app: &mut FigApp, ctx: &Context, p: &Value) -> Result<Value, String>
         } else if let Some(g) = e.get("gamepad") {
             let names = figcraft_doc::proto::GAMEPAD_BUTTONS.join(", ");
             pads.push(pad_name(g).ok_or_else(|| format!("unknown controller button {g} (an index 0-16 or one of {names})"))?.to_string());
+        } else if let Some(p) = e.get("pencilHover").and_then(pos) {
+            // The Apple Pencil hovering at `p`, `height` above the glass (0..1, default 0).
+            let height = e.get("height").and_then(Value::as_f64).filter(|h| h.is_finite()).unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+            events.push(egui::Event::PointerMoved(p));
+            crate::canvas::touch::mark_hover(ctx, Some(height));
         } else if b(e, "leave") {
             events.push(egui::Event::PointerGone);
+            crate::canvas::touch::mark_hover(ctx, None);
         } else if let Some(h) = e.get("hold") {
             let held = egui::Modifiers {
                 alt: b(h, "alt"),

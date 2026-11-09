@@ -324,7 +324,7 @@ popovers and fields (`ui.pointer` and `ui.key` drive the canvas tools and shortc
 `{up: [x, y], button?}`, `{key, shift?, alt?, cmd?}` (pressed and released; egui key names such as
 `ArrowLeft`, `Escape`, `A`), `{text}` (typed text), `{scroll: [dx, dy], shift?, alt?, cmd?}` (a
 mouse wheel at the pointer: the content moves by that many points, so a negative `dy` scrolls down)
-`{leave: true}` (the pointer left the window), `{hold: {alt?, shift?, cmd?}}` (keep those modifier
+`{pencilHover: [x, y], height?}` (the Apple Pencil hovering there, `height` 0–1 above the glass, default 0: the canvas shows its hover reticle; `{leave: true}` ends it), `{leave: true}` (the pointer left the window), `{hold: {alt?, shift?, cmd?}}` (keep those modifier
 keys down for the frames that follow, e.g. Alt while dragging a component from the Assets panel onto
 an instance to swap it; all false releases them) and `{gamepad: "A" | "Gamepad A" | 0}` (a
 controller button pressed in the prototype playing, the presenter's or else the preview pane's: a

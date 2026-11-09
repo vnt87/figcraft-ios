@@ -44,6 +44,7 @@ pub mod live_text;
 pub mod measure_overlay;
 pub mod proto_canvas;
 pub mod render_worker;
+pub mod reticle;
 pub(crate) mod selection_spacing;
 pub mod widget_bar;
 
@@ -344,6 +345,12 @@ pub fn show(app: &mut FigApp, ui: &mut Ui, worker: &mut Worker) {
     crate::dev_mode::focus_bar(app, &ctx, banners);
     // The cursor: the tool's, unless something on the canvas with its own has the pointer.
     app.canvas.cursor = None;
+    // The Apple Pencil's hover reticle goes under the tool's cursor glyph.
+    if let Some((at, height)) =
+        reticle::wanted(app.session.prefs.pencil_reticle, touch::pencil_hover(&ctx), ctx.input(|i| i.pointer.hover_pos()), resp.hovered())
+    {
+        reticle::show(&ctx, &Tokens::get(&ctx), at, height);
+    }
     if let (true, Some(at)) = (own_cursor && resp.hovered(), ctx.input(|i| i.pointer.hover_pos())) {
         let panning = app.canvas.space_pan || app.canvas.middle_pan.is_some();
         let shown = crate::cursors::on_canvas(panning, ctx.input(|i| i.pointer.any_down()), app.canvas.zoom_tool, app.session.tool.overlay.cursor);
