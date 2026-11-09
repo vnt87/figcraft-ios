@@ -2,3 +2,6 @@
 # (a copy of a Windows checkout must still run packaging/server/install.sh).
 *.sh text eol=lf
 packaging/server/* text eol=lf
+
+# The fork's README replaces upstream's on every merge (needs `git config merge.ours.driver true`, see README.md).
+README.md merge=ours
