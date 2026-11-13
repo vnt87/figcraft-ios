@@ -1958,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "figcraft-ios"
-version = "0.15.0"
+version = "0.18.1"
 dependencies = [
  "block2 0.6.2",
  "dispatch2",
