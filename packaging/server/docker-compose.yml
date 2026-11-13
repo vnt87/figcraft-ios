@@ -1,0 +1,29 @@
+# figcraft-server for a home server (Docker Compose v2). Setup: docs/server.md, "With Docker Compose".
+# Copy .env.example to .env and set FIGCRAFT_PUBLIC_URL before the first start.
+name: figcraft-server
+
+services:
+  figcraft-server:
+    build:
+      context: ../..
+      dockerfile: packaging/server/Dockerfile
+    image: figcraft-server:local
+    restart: unless-stopped
+    # docker stop sends SIGTERM: the server saves open files before it exits.
+    stop_grace_period: 30s
+    # Links and the publish address name this URL, not the container's own address.
+    command: ["--public-url", "${FIGCRAFT_PUBLIC_URL:?set FIGCRAFT_PUBLIC_URL in .env}"]
+    # The bind-mounted data folder must be writable by this uid:gid (see .env.example).
+    user: "${FIGCRAFT_UID:-65532}:${FIGCRAFT_GID:-65532}"
+    ports:
+      - "${FIGCRAFT_BIND:-0.0.0.0}:${FIGCRAFT_PORT:-47900}:47900"
+    volumes:
+      - "${FIGCRAFT_DATA:-./data}:/data"
+      - "./server.docker.toml:/etc/figcraft-server/server.toml:ro"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
