@@ -189,6 +189,36 @@ fn pan_view(app: &mut FigApp, ctx: &egui::Context, pos: Pos2, mods: &egui::Modif
     }
 }
 
+/// Zoom (pinch, Cmd/Ctrl+scroll; a plain mouse wheel with Scroll wheel zoom) about the pointer;
+/// other scrolls pan. A gesture with two fingers is [`super::touch::gesture`]'s, so it is left
+/// alone here.
+fn zoom_and_scroll(
+    app: &mut FigApp,
+    resp: &egui::Response,
+    touching: bool,
+    pos: Pos2,
+    scroll: egui::Vec2,
+    zoom_delta: f32,
+    mods: egui::Modifiers,
+) {
+    if !resp.hovered() || touching {
+        return;
+    }
+    if (zoom_delta - 1.0).abs() > 1e-4 {
+        let anchor = app.to_page(pos);
+        if let Ok(ds) = app.session.ds_mut() {
+            let z = ds.view.zoom * f64::from(zoom_delta);
+            ds.view.set_zoom_at(z, (anchor.x, anchor.y));
+            ds.revision += 1;
+        }
+    } else if scroll != egui::Vec2::ZERO
+        && let Ok(ds) = app.session.ds_mut()
+    {
+        ds.view.scroll(f64::from(scroll.x), f64::from(scroll.y), mods.shift);
+        ds.revision += 1;
+    }
+}
+
 /// A finger on the canvas (not the Pencil): where the tool has nothing to grab a press is a tap
 /// and a drag pans ([`super::touch`]). True while such a finger is down, and the frame it lifts.
 fn finger(app: &mut FigApp, ctx: &egui::Context, resp: &egui::Response, pos: Pos2, mods: &egui::Modifiers) -> bool {
@@ -300,23 +330,7 @@ pub(super) fn input(app: &mut FigApp, ui: &mut Ui, resp: &egui::Response) -> boo
         app.ui.key_box = None;
         app.ui.pick = None;
     }
-    // Zoom (pinch, Cmd/Ctrl+scroll; a plain mouse wheel with Scroll wheel zoom) about the pointer;
-    // other scrolls pan.
-    if resp.hovered() && multi.is_none() {
-        if (zoom_delta - 1.0).abs() > 1e-4 {
-            let anchor = app.to_page(pos);
-            if let Ok(ds) = app.session.ds_mut() {
-                let z = ds.view.zoom * f64::from(zoom_delta);
-                ds.view.set_zoom_at(z, (anchor.x, anchor.y));
-                ds.revision += 1;
-            }
-        } else if scroll != egui::Vec2::ZERO
-            && let Ok(ds) = app.session.ds_mut()
-        {
-            ds.view.scroll(f64::from(scroll.x), f64::from(scroll.y), mods.shift);
-            ds.revision += 1;
-        }
-    }
+    zoom_and_scroll(app, resp, multi.is_some(), pos, scroll, zoom_delta, mods);
     // A second finger drops what the first began; until the last finger lifts the pointer is left alone.
     if super::touch::second_finger(app, &ctx) {
         return true;
